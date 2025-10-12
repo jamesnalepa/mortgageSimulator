@@ -1,0 +1,57 @@
+<div class="chart-container" *ngIf="monthlyReports.length > 0">
+  <div class="chart-controls">
+    <h2>Simulation Charts</h2>
+    <div class="view-buttons">
+      <button 
+        class="view-btn"
+        [class.active]="currentView === 'portfolio'"
+        (click)="switchView('portfolio')">
+        Portfolio & Cash
+      </button>
+      <button 
+        class="view-btn"
+        [class.active]="currentView === 'cashflow'"
+        (click)="switchView('cashflow')">
+        Cash Flow
+      </button>
+      <button 
+        class="view-btn"
+        [class.active]="currentView === 'notes'"
+        (click)="switchView('notes')">
+        Notes Analysis
+      </button>
+      <button 
+        class="view-btn"
+        [class.active]="currentView === 'income-vs-profit'"
+        (click)="switchView('income-vs-profit')">
+        Income vs Profit
+      </button>
+    </div>
+  </div>
+
+  <div class="chart-wrapper">
+    <!-- Portfolio Chart -->
+    <div class="chart-view" [class.active]="currentView === 'portfolio'" [style.display]="currentView === 'portfolio' ? 'block' : 'none'">
+      <canvas #portfolioChart width="800" height="400"></canvas>
+    </div>
+
+    <!-- Cash Flow Chart -->
+    <div class="chart-view" [class.active]="currentView === 'cashflow'" [style.display]="currentView === 'cashflow' ? 'block' : 'none'">
+      <canvas #cashFlowChart width="800" height="400"></canvas>
+    </div>
+
+    <!-- Notes Chart -->
+    <div class="chart-view" [class.active]="currentView === 'notes'" [style.display]="currentView === 'notes' ? 'block' : 'none'">
+      <canvas #notesChart width="800" height="400"></canvas>
+    </div>
+
+    <!-- Income vs Profit Chart -->
+    <div class="chart-view" [class.active]="currentView === 'income-vs-profit'" [style.display]="currentView === 'income-vs-profit' ? 'block' : 'none'">
+      <canvas #incomeVsProfitChart width="800" height="400"></canvas>
+    </div>
+  </div>
+</div>
+
+<div class="no-data" *ngIf="monthlyReports.length === 0">
+  <p>Run a simulation to see chart visualization</p>
+</div>

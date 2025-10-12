@@ -1,0 +1,193 @@
+<div class="simulation-container">
+  <h1>Mortgage Note Investment Simulator</h1>
+  
+  <!-- Settings Form -->
+  <div class="settings-panel">
+    <h2>Simulation Settings</h2>
+    <form [formGroup]="simulationForm" (ngSubmit)="runSimulation()">
+      <div class="form-row">
+        <div class="form-group">
+          <label for="initialInvestment">Initial Investment:</label>
+          <input 
+            type="number" 
+            id="initialInvestment"
+            formControlName="initialInvestment"
+            class="form-control"
+            placeholder="15000">
+          <div *ngIf="simulationForm.get('initialInvestment')?.invalid && simulationForm.get('initialInvestment')?.touched" 
+               class="error-message">
+            Initial investment must be at least $1,000
+          </div>
+        </div>
+        
+        <div class="form-group">
+          <label for="monthlyIncome">Monthly Income:</label>
+          <input 
+            type="number" 
+            id="monthlyIncome"
+            formControlName="monthlyIncome"
+            class="form-control"
+            placeholder="0">
+          <div *ngIf="simulationForm.get('monthlyIncome')?.invalid && simulationForm.get('monthlyIncome')?.touched" 
+               class="error-message">
+            Monthly income cannot be negative
+          </div>
+        </div>
+        
+        <div class="form-group">
+          <label for="interestRate">Interest Rate (%):</label>
+          <input 
+            type="number" 
+            id="interestRate"
+            formControlName="interestRate"
+            class="form-control"
+            step="0.1"
+            placeholder="12">
+          <div *ngIf="simulationForm.get('interestRate')?.invalid && simulationForm.get('interestRate')?.touched" 
+               class="error-message">
+            Interest rate must be between 0.1% and 50%
+          </div>
+        </div>
+        
+        <div class="form-group">
+          <label for="startMonth">Starting Month:</label>
+          <select 
+            id="startMonth"
+            formControlName="startMonth"
+            class="form-control">
+            <option value="1">January</option>
+            <option value="2">February</option>
+            <option value="3">March</option>
+            <option value="4">April</option>
+            <option value="5">May</option>
+            <option value="6">June</option>
+            <option value="7">July</option>
+            <option value="8">August</option>
+            <option value="9">September</option>
+            <option value="10">October</option>
+            <option value="11">November</option>
+            <option value="12">December</option>
+          </select>
+        </div>
+        
+        <div class="form-group">
+          <label for="startYear">Starting Year:</label>
+          <input 
+            type="number" 
+            id="startYear"
+            formControlName="startYear"
+            class="form-control"
+            min="2020"
+            max="2050"
+            placeholder="2024">
+          <div *ngIf="simulationForm.get('startYear')?.invalid && simulationForm.get('startYear')?.touched" 
+               class="error-message">
+            Year must be between 2020 and 2050
+          </div>
+        </div>
+      </div>
+      
+      <div class="button-group">
+        <button 
+          type="submit" 
+          class="btn btn-primary"
+          [disabled]="simulationForm.invalid || isRunning">
+          {{ isRunning ? 'Running...' : 'Run Simulation' }}
+        </button>
+        <button 
+          type="button" 
+          class="btn btn-secondary"
+          (click)="resetSimulation()"
+          [disabled]="isRunning">
+          Reset
+        </button>
+      </div>
+    </form>
+  </div>
+
+  <!-- Charts Section -->
+  <app-simulation-chart [monthlyReports]="monthlyReports"></app-simulation-chart>
+
+  <!-- Results Table -->
+  <div class="results-panel" *ngIf="monthlyReports.length > 0">
+    <h2>Simulation Results (10 Years)</h2>
+    <div class="summary-stats">
+      <div class="stat-card">
+        <h3>Final Portfolio Value</h3>
+        <p class="stat-value">{{ formatCurrency((monthlyReports.length > 0 ? monthlyReports[monthlyReports.length - 1].totalPortfolioValue : 0) || 0) }}</p>
+      </div>
+      <div class="stat-card">
+        <h3>Final Cash Available</h3>
+        <p class="stat-value">{{ formatCurrency((monthlyReports.length > 0 ? monthlyReports[monthlyReports.length - 1].availableCash : 0) || 0) }}</p>
+      </div>
+      <div class="stat-card">
+        <h3>Total Active Notes</h3>
+        <p class="stat-value">{{ (monthlyReports.length > 0 ? monthlyReports[monthlyReports.length - 1].totalNotes : 0) || 0 }}</p>
+      </div>
+      <div class="stat-card income-stat">
+        <h3>Total Income Added</h3>
+        <p class="stat-value">{{ formatCurrency((monthlyReports.length > 0 ? monthlyReports[monthlyReports.length - 1].totalIncomeContributed : 0) || 0) }}</p>
+      </div>
+      <div class="stat-card profit-stat">
+        <h3>Total Profit Generated</h3>
+        <p class="stat-value">{{ formatCurrency((monthlyReports.length > 0 ? monthlyReports[monthlyReports.length - 1].totalProfitGenerated : 0) || 0) }}</p>
+      </div>
+    </div>
+    
+    <div class="table-container">
+      <table class="results-table">
+        <thead>
+          <tr>
+            <th>Month</th>
+            <th>Active Notes</th>
+            <th>Monthly Revenue</th>
+            <th>Available Cash</th>
+            <th>Next Note Value</th>
+            <th>Portfolio Value</th>
+            <th>Total Income Added</th>
+            <th>Total Profit Generated</th>
+            <th>Current Note Being Repaid</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngFor="let report of monthlyReports; let i = index" 
+              [class.highlight]="i % 12 === 0">
+            <td>{{ report.monthName }}</td>
+            <td>{{ report.totalNotes }}</td>
+            <td>{{ formatCurrency(report.monthlyRevenue) }}</td>
+            <td>{{ formatCurrency(report.availableCash) }}</td>
+            <td>{{ formatCurrency(report.nextNoteValue) }}</td>
+            <td>{{ formatCurrency(report.totalPortfolioValue) }}</td>
+            <td>{{ formatCurrency(report.totalIncomeContributed) }}</td>
+            <td>{{ formatCurrency(report.totalProfitGenerated) }}</td>
+            <td>
+              <span *ngIf="report.currentNoteBeingRepaid; else noNote">
+                {{ report.currentNoteBeingRepaid.id }}<br>
+                <small>Recovered: {{ formatCurrency(report.currentNoteBeingRepaid.amountRecovered || 0) }} / 
+                {{ formatCurrency(report.currentNoteBeingRepaid.totalValue) }}</small>
+              </span>
+              <ng-template #noNote>-</ng-template>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Active Notes Details -->
+  <div class="notes-panel" *ngIf="monthlyReports.length > 0">
+    <h2>Current Active Notes (Month {{ monthlyReports.length }})</h2>
+    <div *ngIf="getLastReport()?.activeNotes?.length === 0" class="no-notes">
+      No active notes remaining
+    </div>
+    <div class="notes-grid" *ngIf="getLastReport()?.activeNotes && getLastReport()!.activeNotes.length > 0">
+      <div class="note-card" *ngFor="let note of getLastReport()!.activeNotes">
+        <h4>{{ note.id }}</h4>
+        <p><strong>Investment Value:</strong> {{ formatCurrency(note.totalValue) }}</p>
+        <p><strong>Monthly Revenue:</strong> {{ formatCurrency(note.monthlyPayment) }}</p>
+        <p><strong>Months Remaining:</strong> {{ note.monthsRemaining }}</p>
+        <p><strong>Interest Rate:</strong> {{ formatPercent(note.interestRate) }}</p>
+      </div>
+    </div>
+  </div>
+</div>
