@@ -1,3 +1,4 @@
+// ...existing code...
 import { Component, OnInit, OnDestroy } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule, ReactiveFormsModule, FormBuilder, FormGroup, Validators } from '@angular/forms';
@@ -27,8 +28,10 @@ export class SimulationComponent implements OnInit, OnDestroy {
       initialInvestment: [15000, [Validators.required, Validators.min(1000)]],
       monthlyIncome: [2000, [Validators.required, Validators.min(0)]],
       interestRate: [12, [Validators.required, Validators.min(0.1), Validators.max(50)]],
-      startMonth: [1, [Validators.required, Validators.min(1), Validators.max(12)]], // January
-      startYear: [2026, [Validators.required, Validators.min(2020), Validators.max(2050)]]
+      startMonth: [1, [Validators.required, Validators.min(1), Validators.max(12)]],
+      startYear: [2026, [Validators.required, Validators.min(2020), Validators.max(2050)]],
+      simulationMonths: [120, [Validators.required, Validators.min(1), Validators.max(1200)]],
+      maxNoteValue: [75000, [Validators.required, Validators.min(5000), Validators.max(500000)]]
     });
   }
 
@@ -57,7 +60,9 @@ export class SimulationComponent implements OnInit, OnDestroy {
         monthlyIncome: this.simulationForm.value.monthlyIncome,
         interestRate: this.simulationForm.value.interestRate / 100, // Convert percentage to decimal
         startMonth: this.simulationForm.value.startMonth,
-        startYear: this.simulationForm.value.startYear
+        startYear: this.simulationForm.value.startYear,
+        simulationMonths: this.simulationForm.value.simulationMonths,
+        maxNoteValue: this.simulationForm.value.maxNoteValue
       };
       
       this.simulationService.runSimulation(settings);
@@ -84,5 +89,26 @@ export class SimulationComponent implements OnInit, OnDestroy {
 
   getLastReport(): MonthlyReport | undefined {
     return this.monthlyReports.length > 0 ? this.monthlyReports[this.monthlyReports.length - 1] : undefined;
+  }
+
+  // Returns the end net worth summary for the simulation
+  get endNetWorthSummary() {
+    const last = this.getLastReport();
+    if (!last) {
+      return {
+        totalInvested: 0,
+        totalProfit: 0,
+        portfolioValue: 0,
+        finalCash: 0,
+        netWorth: 0
+      };
+    }
+    // totalInvested = totalIncomeContributed + initialInvestment
+    const totalInvested = last.totalIncomeContributed + (this.simulationForm.value.initialInvestment || 0);
+    const totalProfit = last.totalProfitGenerated;
+    const portfolioValue = last.totalPortfolioValue;
+    const finalCash = last.availableCash;
+    const netWorth = totalInvested + totalProfit + portfolioValue + finalCash;
+    return { totalInvested, totalProfit, portfolioValue, finalCash, netWorth };
   }
 }

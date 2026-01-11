@@ -85,6 +85,38 @@
             Year must be between 2020 and 2050
           </div>
         </div>
+
+        <div class="form-group">
+          <label for="simulationMonths">Number of months to simulate:</label>
+          <input 
+            type="number" 
+            id="simulationMonths"
+            formControlName="simulationMonths"
+            class="form-control"
+            min="1"
+            max="1200"
+            placeholder="120">
+          <div *ngIf="simulationForm.get('simulationMonths')?.invalid && simulationForm.get('simulationMonths')?.touched" 
+               class="error-message">
+            Number of months must be between 1 and 1200
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label for="maxNoteValue">Max value to spend on one note:</label>
+          <input 
+            type="number" 
+            id="maxNoteValue"
+            formControlName="maxNoteValue"
+            class="form-control"
+            min="5000"
+            max="500000"
+            placeholder="15000">
+          <div *ngIf="simulationForm.get('maxNoteValue')?.invalid && simulationForm.get('maxNoteValue')?.touched" 
+               class="error-message">
+            Note value must be between 5,000 and 500,000
+          </div>
+        </div>
       </div>
       
       <div class="button-group">
@@ -105,13 +137,24 @@
     </form>
   </div>
 
-  <!-- Charts Section -->
-  <app-simulation-chart [monthlyReports]="monthlyReports"></app-simulation-chart>
+<!--<app-simulation-chart [monthlyReports]="monthlyReports"></app-simulation-chart> -->
 
   <!-- Results Table -->
   <div class="results-panel" *ngIf="monthlyReports.length > 0">
-    <h2>Simulation Results (10 Years)</h2>
+    <h2>Simulation Results</h2>
     <div class="summary-stats">
+      <div class="stat-card">
+        <div class="net-worth-summary" *ngIf="endNetWorthSummary.netWorth > 0">
+          <h3>End Total Net Worth</h3>
+          <p class="stat-value">{{ endNetWorthSummary.netWorth | currency:'USD':'symbol':'1.0-0' }}</p>
+          <!-- <small>
+            (Invested: {{ endNetWorthSummary.totalInvested | currency:'USD':'symbol':'1.0-0' }},
+            Profit: {{ endNetWorthSummary.totalProfit | currency:'USD':'symbol':'1.0-0' }},
+            Portfolio Value: {{ endNetWorthSummary.portfolioValue | currency:'USD':'symbol':'1.0-0' }},
+            Final Cash: {{ endNetWorthSummary.finalCash | currency:'USD':'symbol':'1.0-0' }})
+          </small> -->
+        </div>
+      </div>
       <div class="stat-card">
         <h3>Final Portfolio Value</h3>
         <p class="stat-value">{{ formatCurrency((monthlyReports.length > 0 ? monthlyReports[monthlyReports.length - 1].totalPortfolioValue : 0) || 0) }}</p>
@@ -129,8 +172,16 @@
         <p class="stat-value">{{ formatCurrency((monthlyReports.length > 0 ? monthlyReports[monthlyReports.length - 1].totalIncomeContributed : 0) || 0) }}</p>
       </div>
       <div class="stat-card profit-stat">
-        <h3>Total Profit Generated</h3>
+        <h3>Total Profit Generated (Interest Only)</h3>
         <p class="stat-value">{{ formatCurrency((monthlyReports.length > 0 ? monthlyReports[monthlyReports.length - 1].totalProfitGenerated : 0) || 0) }}</p>
+      </div>
+      <div class="stat-card">
+        <h3>Last Month Interest</h3>
+        <p class="stat-value">{{ formatCurrency((monthlyReports.length > 0 ? monthlyReports[monthlyReports.length - 1].monthlyInterest : 0) || 0) }}</p>
+      </div>
+      <div class="stat-card">
+        <h3>Last Month Principal</h3>
+        <p class="stat-value">{{ formatCurrency((monthlyReports.length > 0 ? monthlyReports[monthlyReports.length - 1].monthlyPrincipal : 0) || 0) }}</p>
       </div>
     </div>
     
@@ -141,11 +192,13 @@
             <th>Month</th>
             <th>Active Notes</th>
             <th>Monthly Revenue</th>
+            <th>Interest</th>
+            <th>Principal</th>
             <th>Available Cash</th>
             <th>Next Note Value</th>
             <th>Portfolio Value</th>
             <th>Total Income Added</th>
-            <th>Total Profit Generated</th>
+            <th>Total Profit Generated (Interest)</th>
             <th>Current Note Being Repaid</th>
           </tr>
         </thead>
@@ -155,6 +208,8 @@
             <td>{{ report.monthName }}</td>
             <td>{{ report.totalNotes }}</td>
             <td>{{ formatCurrency(report.monthlyRevenue) }}</td>
+            <td>{{ formatCurrency(report.monthlyInterest) }}</td>
+            <td>{{ formatCurrency(report.monthlyPrincipal) }}</td>
             <td>{{ formatCurrency(report.availableCash) }}</td>
             <td>{{ formatCurrency(report.nextNoteValue) }}</td>
             <td>{{ formatCurrency(report.totalPortfolioValue) }}</td>

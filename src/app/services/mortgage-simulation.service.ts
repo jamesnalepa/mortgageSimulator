@@ -16,14 +16,35 @@ export class MortgageSimulationService {
     initialInvestment: 15000,
     monthlyIncome: 0,
     interestRate: 0.12,
-    simulationMonths: 120, // 10 years
-    maxNoteValue: 75000,
+    simulationMonths: 240,
+    maxNoteValue: 1000000,
     noteValueMultiplier: 1.5,
     startMonth: new Date().getMonth() + 1, // current month (1-12)
     startYear: new Date().getFullYear() // current year
   };
 
+
   constructor() { }
+
+  // Returns the principal and interest for the current month for a given note
+  private getPaymentBreakdown(note: MortgageNote): { principal: number; interest: number } {
+    const monthlyRate = note.interestRate / 12;
+    const n = note.monthsRemaining;
+    if (n <= 0) return { principal: 0, interest: 0 };
+    // Remaining balance using amortization formula
+    const balance = this.getRemainingBalance(note);
+    const interest = balance * monthlyRate;
+    const principal = note.monthlyPayment - interest;
+    return { principal, interest };
+  }
+
+  // Calculates the remaining balance of a note
+  private getRemainingBalance(note: MortgageNote): number {
+    const monthlyRate = note.interestRate / 12;
+    const n = note.monthsRemaining;
+    if (n <= 0) return 0;
+    return note.monthlyPayment * (1 - Math.pow(1 + monthlyRate, -n)) / monthlyRate;
+  }
 
   public runSimulation(settings: Partial<SimulationSettings>): Observable<MonthlyReport[]> {
     this.isSimulationRunning.next(true);
@@ -45,18 +66,20 @@ export class MortgageSimulationService {
       // Add monthly income
       availableCash += config.monthlyIncome;
       totalIncomeContributed += config.monthlyIncome;
-      
-      // Calculate monthly revenue from existing notes and track completed notes
-      let monthlyRevenue = 0;
+
+      // Calculate monthly interest and principal from existing notes
+      let monthlyInterest = 0;
+      let monthlyPrincipal = 0;
       const activeNotes: MortgageNote[] = [];
       let notesCompletedThisMonth = 0;
-      
+
       notes.forEach(note => {
         if (note.monthsRemaining > 0) {
-          // Generate revenue from the note (monthly interest)
-          monthlyRevenue += note.monthlyPayment;
+          const { principal, interest } = this.getPaymentBreakdown(note);
+          monthlyInterest += interest;
+          monthlyPrincipal += principal;
           note.monthsRemaining--;
-          
+
           if (note.monthsRemaining > 0) {
             activeNotes.push(note);
           } else {
@@ -64,13 +87,13 @@ export class MortgageSimulationService {
           }
         }
       });
-      
-      availableCash += monthlyRevenue;
-      totalProfitGenerated += monthlyRevenue;
+
+      availableCash += monthlyPrincipal + monthlyInterest;
+      totalProfitGenerated += monthlyInterest;
       notes = activeNotes;
       
       // Track recovery of current note investment through monthly income and revenue  
-      const totalCashThisMonth = config.monthlyIncome + monthlyRevenue;
+  const totalCashThisMonth = config.monthlyIncome + monthlyPrincipal + monthlyInterest;
       if (currentNoteBeingRepaid !== null) {
         amountRecoveredFromCurrentNote += totalCashThisMonth;
         
@@ -139,8 +162,8 @@ export class MortgageSimulationService {
         // Check if we should increase note value for NEXT purchase
         // Only increase if current note being repaid can be recovered in 3 months
         if (currentNoteBeingRepaid !== null) {
-          const futureMonthlyCashFlow = config.monthlyIncome + monthlyRevenue + potentialNote.monthlyPayment;
-          if ((futureMonthlyCashFlow * 3) >= currentNoteBeingRepaid.totalValue && nextNoteValue < config.maxNoteValue) {
+          const futureMonthlyCashFlow = config.monthlyIncome + monthlyPrincipal + monthlyInterest + potentialNote.monthlyPayment;
+          if ((futureMonthlyCashFlow * 1) >= currentNoteBeingRepaid.totalValue && nextNoteValue < config.maxNoteValue) {
             nextNoteValue = Math.min(nextNoteValue * config.noteValueMultiplier, config.maxNoteValue);
           }
         }
@@ -158,7 +181,9 @@ export class MortgageSimulationService {
           amountRecovered: amountRecoveredFromCurrentNote 
         } : undefined,
         monthlyIncome: config.monthlyIncome,
-        monthlyRevenue,
+        monthlyRevenue: monthlyInterest + monthlyPrincipal,
+        monthlyInterest,
+        monthlyPrincipal,
         availableCash,
         nextNoteValue,
         totalPortfolioValue: notes.reduce((sum, note) => sum + note.totalValue, 0),

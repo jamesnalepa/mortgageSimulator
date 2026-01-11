@@ -27,7 +27,9 @@ export interface MonthlyReport {
   activeNotes: MortgageNote[];
   currentNoteBeingRepaid?: MortgageNote;
   monthlyIncome: number;
-  monthlyRevenue: number; // interest from notes
+  monthlyRevenue: number; // total of interest + principal from notes
+  monthlyInterest: number; // interest portion only
+  monthlyPrincipal: number; // principal portion only
   availableCash: number;
   nextNoteValue: number;
   totalPortfolioValue: number;
