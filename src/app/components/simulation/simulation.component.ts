@@ -31,7 +31,8 @@ export class SimulationComponent implements OnInit, OnDestroy {
       startMonth: [1, [Validators.required, Validators.min(1), Validators.max(12)]],
       startYear: [2026, [Validators.required, Validators.min(2020), Validators.max(2050)]],
       simulationMonths: [120, [Validators.required, Validators.min(1), Validators.max(1200)]],
-      maxNoteValue: [75000, [Validators.required, Validators.min(5000), Validators.max(500000)]]
+      maxNoteValue: [75000, [Validators.required, Validators.min(5000), Validators.max(500000)]],
+      noteValueMultiplier: [1.5, [Validators.required, Validators.min(1.0), Validators.max(2.0)]]
     });
   }
 
@@ -62,7 +63,8 @@ export class SimulationComponent implements OnInit, OnDestroy {
         startMonth: this.simulationForm.value.startMonth,
         startYear: this.simulationForm.value.startYear,
         simulationMonths: this.simulationForm.value.simulationMonths,
-        maxNoteValue: this.simulationForm.value.maxNoteValue
+        maxNoteValue: this.simulationForm.value.maxNoteValue,
+        noteValueMultiplier: this.simulationForm.value.noteValueMultiplier
       };
       
       this.simulationService.runSimulation(settings);
