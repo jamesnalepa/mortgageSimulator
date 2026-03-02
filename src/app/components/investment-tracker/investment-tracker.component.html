@@ -1,0 +1,275 @@
+<div class="tracker-container">
+  <h1>Investment Tracker</h1>
+
+  <!-- Current Month Display -->
+  <div class="month-display">
+    <h3>{{ getCurrentMonthLabel() }}</h3>
+  </div>
+
+  <!-- Add Investment Form -->
+  <div class="form-panel">
+    <h2>Add New Investment</h2>
+    <form [formGroup]="investmentForm" (ngSubmit)="addInvestment()">
+      <div class="form-row">
+        <div class="form-group">
+          <label for="type">Investment Type:</label>
+          <select id="type" formControlName="type" class="form-control">
+            <option value="mortgage-note">Mortgage Note</option>
+            <option value="hysa">HYSA</option>
+            <option value="annuity">Annuity</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label for="investmentAmount">Investment Amount ($):</label>
+          <input
+            type="number"
+            id="investmentAmount"
+            formControlName="investmentAmount"
+            class="form-control"
+            min="100"
+            placeholder="10000"
+          />
+        </div>
+
+        <div class="form-group">
+          <label for="interestRate">Annual Interest Rate (%):</label>
+          <input
+            type="number"
+            id="interestRate"
+            formControlName="interestRate"
+            class="form-control"
+            step="0.1"
+            min="0.1"
+            max="50"
+            placeholder="12"
+          />
+        </div>
+
+        <div class="form-group">
+          <label for="termLengthMonths">Term Length (months):</label>
+          <input
+            type="number"
+            id="termLengthMonths"
+            formControlName="termLengthMonths"
+            class="form-control"
+            min="1"
+            max="360"
+            placeholder="60"
+          />
+        </div>
+      </div>
+
+      <div class="form-row">
+        <div class="form-group">
+          <label for="monthlyPayment">Calculated Monthly Payment ($):</label>
+          <input
+            type="number"
+            id="monthlyPayment"
+            formControlName="monthlyPayment"
+            class="form-control"
+            readonly
+          />
+        </div>
+
+        <div class="form-group">
+          <label for="notes">Notes:</label>
+          <textarea
+            id="notes"
+            formControlName="notes"
+            class="form-control"
+            rows="2"
+            placeholder="Add any notes about this investment..."
+          ></textarea>
+        </div>
+      </div>
+
+      <div class="button-group">
+        <button type="submit" class="btn btn-primary" [disabled]="investmentForm.invalid">
+          Add Investment
+        </button>
+        <button type="button" class="btn btn-secondary" (click)="processMonth()">
+          Process Month
+        </button>
+        <button
+          type="button"
+          class="btn btn-danger"
+          (click)="resetAll()"
+          [disabled]="investments.length === 0"
+        >
+          Reset All
+        </button>
+        <button
+          type="button"
+          class="btn btn-success"
+          (click)="exportToCSV()"
+          [disabled]="investments.length === 0"
+        >
+          Export to CSV
+        </button>
+        <button type="button" class="btn btn-info" (click)="fileInput.click()">
+          Import from CSV
+        </button>
+        <input
+          #fileInput
+          type="file"
+          accept=".csv"
+          style="display: none"
+          (change)="importFromCSV($event)"
+        />
+      </div>
+    </form>
+  </div>
+
+  <!-- Current Portfolio Summary -->
+  <div class="summary-section" *ngIf="currentSnapshot">
+    <h2>Portfolio Summary</h2>
+    <div class="summary-cards">
+      <div class="summary-card">
+        <h3>Total Invested</h3>
+        <p class="summary-value">{{ formatCurrency(currentSnapshot.totalInvested) }}</p>
+      </div>
+      <div class="summary-card">
+        <h3>Total Balance</h3>
+        <p class="summary-value">{{ formatCurrency(currentSnapshot.totalBalance) }}</p>
+      </div>
+      <div class="summary-card">
+        <h3>Total Interest Earned</h3>
+        <p class="summary-value interest">{{ formatCurrency(currentSnapshot.totalInterestEarned) }}</p>
+      </div>
+      <div class="summary-card highlight">
+        <h3>Net Worth</h3>
+        <p class="summary-value">{{ formatCurrency(currentSnapshot.netWorth) }}</p>
+      </div>
+      <div class="summary-card">
+        <h3>Active Investments</h3>
+        <p class="summary-value">{{ currentSnapshot.activeInvestments }}</p>
+      </div>
+      <div class="summary-card">
+        <h3>Completed Investments</h3>
+        <p class="summary-value">{{ currentSnapshot.completedInvestments }}</p>
+      </div>
+    </div>
+
+    <!-- Investment Type Breakdown -->
+    <div class="breakdown-section">
+      <h3>Investment Mix</h3>
+      <div class="breakdown-grid">
+        <div class="breakdown-card">
+          <h4>Mortgage Notes</h4>
+          <p><strong>Count:</strong> {{ currentSnapshot.investmentsByType.mortgageNotes.count }}</p>
+          <p><strong>Invested:</strong> {{ formatCurrency(currentSnapshot.investmentsByType.mortgageNotes.totalInvested) }}</p>
+          <p><strong>Balance:</strong> {{ formatCurrency(currentSnapshot.investmentsByType.mortgageNotes.totalBalance) }}</p>
+          <p class="interest"><strong>Interest:</strong> {{ formatCurrency(currentSnapshot.investmentsByType.mortgageNotes.totalInterest) }}</p>
+        </div>
+        <div class="breakdown-card">
+          <h4>HYSA</h4>
+          <p><strong>Count:</strong> {{ currentSnapshot.investmentsByType.hysa.count }}</p>
+          <p><strong>Invested:</strong> {{ formatCurrency(currentSnapshot.investmentsByType.hysa.totalInvested) }}</p>
+          <p><strong>Balance:</strong> {{ formatCurrency(currentSnapshot.investmentsByType.hysa.totalBalance) }}</p>
+          <p class="interest"><strong>Interest:</strong> {{ formatCurrency(currentSnapshot.investmentsByType.hysa.totalInterest) }}</p>
+        </div>
+        <div class="breakdown-card">
+          <h4>Annuities</h4>
+          <p><strong>Count:</strong> {{ currentSnapshot.investmentsByType.annuities.count }}</p>
+          <p><strong>Invested:</strong> {{ formatCurrency(currentSnapshot.investmentsByType.annuities.totalInvested) }}</p>
+          <p><strong>Balance:</strong> {{ formatCurrency(currentSnapshot.investmentsByType.annuities.totalBalance) }}</p>
+          <p class="interest"><strong>Interest:</strong> {{ formatCurrency(currentSnapshot.investmentsByType.annuities.totalInterest) }}</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Active Investments Table -->
+  <div class="investments-section">
+    <h2>Active Investments</h2>
+    <div class="table-container" *ngIf="investments.length > 0">
+      <table class="investments-table">
+        <thead>
+          <tr>
+            <th>Type</th>
+            <th>Initial Investment</th>
+            <th>Current Balance</th>
+            <th>Monthly Payment</th>
+            <th>Interest Rate</th>
+            <th>Total Interest</th>
+            <th>Months Remaining</th>
+            <th>Status</th>
+            <th>Started</th>
+            <th>Notes</th>
+            <th>Action</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr
+            *ngFor="let investment of investments"
+            [class.completed]="investment.status === 'completed'"
+          >
+            <td class="type-badge" [ngClass]="investment.type">
+              {{ getInvestmentTypeLabel(investment.type) }}
+            </td>
+            <td>{{ formatCurrency(investment.investmentAmount) }}</td>
+            <td class="balance">{{ formatCurrency(investment.currentBalance) }}</td>
+            <td>{{ formatCurrency(investment.monthlyPayment) }}</td>
+            <td>{{ formatPercent(investment.interestRate) }}</td>
+            <td class="interest">{{ formatCurrency(investment.totalInterestEarned) }}</td>
+            <td>{{ investment.monthsRemaining }}</td>
+            <td>
+              <span
+                class="status-badge"
+                [ngClass]="investment.status === 'active' ? 'active' : 'completed'"
+              >
+                {{ investment.status }}
+              </span>
+            </td>
+            <td>{{ investment.purchaseDate | date: 'MMM yyyy' }}</td>
+            <td class="notes-cell">{{ investment.notes || '-' }}</td>
+            <td>
+              <button
+                class="btn-small btn-danger"
+                (click)="deleteInvestment(investment.id)"
+                title="Delete investment"
+              >
+                ✕
+              </button>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="empty-state" *ngIf="investments.length === 0">
+      <p>No investments yet. Add one to get started!</p>
+    </div>
+  </div>
+
+  <!-- Net Worth History Chart Area -->
+  <div class="history-section" *ngIf="netWorthHistory.length > 0">
+    <h2>Net Worth Over Time</h2>
+    <div class="history-container">
+      <p class="info-text">
+        Showing {{ netWorthHistory.length }} snapshot{{ netWorthHistory.length !== 1 ? 's' : '' }}
+      </p>
+      <div class="history-summary">
+        <div class="history-card">
+          <h4>Initial Net Worth</h4>
+          <p>{{ formatCurrency(netWorthHistory[0].netWorth) }}</p>
+        </div>
+        <div class="history-card">
+          <h4>Current Net Worth</h4>
+          <p>{{ formatCurrency(netWorthHistory[netWorthHistory.length - 1].netWorth) }}</p>
+        </div>
+        <div class="history-card">
+          <h4>Total Growth</h4>
+          <p>
+            {{
+              formatCurrency(
+                netWorthHistory[netWorthHistory.length - 1].netWorth -
+                  netWorthHistory[0].netWorth
+              )
+            }}
+          </p>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>

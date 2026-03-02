@@ -1,0 +1,454 @@
+.tracker-container {
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 20px;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+}
+
+h1 {
+  color: #333;
+  margin-bottom: 30px;
+  text-align: center;
+}
+
+/* Month Display */
+.month-display {
+  background: linear-gradient(135deg, #1e3a8a 0%, #7c3aed 100%);
+  color: white;
+  padding: 20px;
+  border-radius: 8px;
+  text-align: center;
+  margin-bottom: 30px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
+}
+
+.month-display h3 {
+  margin: 0;
+  font-size: 24px;
+  font-weight: 800;
+  letter-spacing: 0.5px;
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+}
+
+h2 {
+  color: #555;
+  margin-top: 30px;
+  margin-bottom: 20px;
+  border-bottom: 2px solid #007bff;
+  padding-bottom: 10px;
+}
+
+h3 {
+  color: #666;
+  margin-bottom: 15px;
+}
+
+h4 {
+  color: #777;
+  margin-bottom: 10px;
+}
+
+/* Form */
+.form-panel {
+  background: #f9f9f9;
+  border-radius: 8px;
+  padding: 25px;
+  margin-bottom: 30px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.form-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: 15px;
+  margin-bottom: 15px;
+}
+
+.form-group {
+  display: flex;
+  flex-direction: column;
+}
+
+.form-group label {
+  font-size: 13px;
+  font-weight: 600;
+  color: #555;
+  margin-bottom: 6px;
+}
+
+.form-control {
+  padding: 10px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  font-size: 14px;
+  font-family: inherit;
+}
+
+.form-control:focus {
+  outline: none;
+  border-color: #007bff;
+  box-shadow: 0 0 0 3px rgba(0, 123, 255, 0.1);
+}
+
+textarea.form-control {
+  resize: vertical;
+  min-height: 60px;
+}
+
+/* Buttons */
+.button-group {
+  display: flex;
+  gap: 10px;
+  margin-top: 25px;
+  flex-wrap: wrap;
+}
+
+.btn {
+  padding: 12px 24px;
+  border: none;
+  border-radius: 4px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.btn-primary {
+  background-color: #007bff;
+  color: white;
+}
+
+.btn-primary:hover:not(:disabled) {
+  background-color: #0056b3;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 123, 255, 0.3);
+}
+
+.btn-secondary {
+  background-color: #6c757d;
+  color: white;
+}
+
+.btn-secondary:hover:not(:disabled) {
+  background-color: #545b62;
+}
+
+.btn-danger {
+  background-color: #dc3545;
+  color: white;
+}
+
+.btn-danger:hover:not(:disabled) {
+  background-color: #c82333;
+}
+
+.btn-success {
+  background-color: #28a745;
+  color: white;
+}
+
+.btn-success:hover:not(:disabled) {
+  background-color: #218838;
+}
+
+.btn-info {
+  background-color: #17a2b8;
+  color: white;
+}
+
+.btn-info:hover:not(:disabled) {
+  background-color: #138496;
+}
+
+.btn-small {
+  padding: 6px 12px;
+  font-size: 12px;
+}
+
+.btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Summary Section */
+.summary-section {
+  background: white;
+  border-radius: 8px;
+  padding: 25px;
+  margin-bottom: 30px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+}
+
+.summary-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 15px;
+  margin-bottom: 30px;
+}
+
+.summary-card {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  padding: 20px;
+  border-radius: 8px;
+  text-align: center;
+}
+
+.summary-card.highlight {
+  background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+}
+
+.summary-card h3 {
+  font-size: 13px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  margin-bottom: 10px;
+  color: rgba(255, 255, 255, 0.9);
+}
+
+.summary-value {
+  font-size: 24px;
+  font-weight: 700;
+  margin: 0;
+  color: white;
+}
+
+.summary-value.interest {
+  color: #a8ff60;
+}
+
+/* Breakdown Section */
+.breakdown-section {
+  background: #f5f5f5;
+  padding: 20px;
+  border-radius: 8px;
+}
+
+.breakdown-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: 15px;
+}
+
+.breakdown-card {
+  background: white;
+  padding: 20px;
+  border-radius: 6px;
+  border-left: 4px solid #007bff;
+}
+
+.breakdown-card h4 {
+  margin-top: 0;
+  color: #007bff;
+}
+
+.breakdown-card p {
+  margin: 8px 0;
+  font-size: 14px;
+  color: #666;
+}
+
+.breakdown-card p strong {
+  color: #333;
+}
+
+.breakdown-card p.interest {
+  color: #28a745;
+}
+
+/* Investments Section */
+.investments-section {
+  background: white;
+  border-radius: 8px;
+  padding: 25px;
+  margin-bottom: 30px;
+}
+
+.table-container {
+  overflow-x: auto;
+  max-height: 800px;
+  overflow-y: auto;
+  border-radius: 6px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.investments-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.investments-table thead {
+  background-color: #f8f9fa;
+  border-bottom: 2px solid #dee2e6;
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+
+.investments-table th {
+  padding: 12px;
+  text-align: left;
+  font-weight: 600;
+  color: #333;
+  white-space: nowrap;
+}
+
+.investments-table td {
+  padding: 12px;
+  border-bottom: 1px solid #dee2e6;
+  color: #666;
+}
+
+.investments-table tbody tr:hover {
+  background-color: #f5f5f5;
+}
+
+.investments-table tr.completed {
+  opacity: 0.7;
+  background-color: #f0f0f0;
+}
+
+.type-badge {
+  font-weight: 600;
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 11px;
+  text-transform: uppercase;
+}
+
+.type-badge.mortgage-note {
+  background-color: #e3f2fd;
+  color: #1565c0;
+}
+
+.type-badge.hysa {
+  background-color: #e8f5e9;
+  color: #2e7d32;
+}
+
+.type-badge.annuity {
+  background-color: #fff3e0;
+  color: #e65100;
+}
+
+.status-badge {
+  padding: 4px 12px;
+  border-radius: 12px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+}
+
+.status-badge.active {
+  background-color: #d4edda;
+  color: #155724;
+}
+
+.status-badge.completed {
+  background-color: #d1ecf1;
+  color: #0c5460;
+}
+
+.balance {
+  font-weight: 600;
+  color: #007bff;
+}
+
+.interest {
+  color: #28a745;
+  font-weight: 500;
+}
+
+.notes-cell {
+  max-width: 150px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-size: 12px;
+}
+
+.empty-state {
+  text-align: center;
+  padding: 40px;
+  color: #999;
+  font-size: 16px;
+}
+
+/* History Section */
+.history-section {
+  background: white;
+  border-radius: 8px;
+  padding: 25px;
+}
+
+.history-container {
+  background: #f9f9f9;
+  padding: 20px;
+  border-radius: 6px;
+}
+
+.info-text {
+  color: #888;
+  font-size: 13px;
+  margin-bottom: 15px;
+}
+
+.history-summary {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 15px;
+}
+
+.history-card {
+  background: white;
+  padding: 15px;
+  border-radius: 6px;
+  text-align: center;
+  border: 1px solid #ddd;
+}
+
+.history-card h4 {
+  margin: 0 0 10px 0;
+  font-size: 12px;
+  color: #777;
+  text-transform: uppercase;
+}
+
+.history-card p {
+  font-size: 20px;
+  font-weight: 700;
+  color: #007bff;
+  margin: 0;
+}
+
+@media (max-width: 768px) {
+  .form-row {
+    grid-template-columns: 1fr;
+  }
+
+  .summary-cards {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .breakdown-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .button-group {
+    flex-direction: column;
+  }
+
+  .btn {
+    width: 100%;
+  }
+
+  .investments-table {
+    font-size: 11px;
+  }
+
+  .investments-table th,
+  .investments-table td {
+    padding: 8px;
+  }
+}

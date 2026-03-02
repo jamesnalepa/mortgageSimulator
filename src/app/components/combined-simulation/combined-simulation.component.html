@@ -1,0 +1,416 @@
+<div class="simulation-container">
+  <h1>Combined Investment Portfolio Simulator</h1>
+
+  <!-- Settings Form -->
+  <div class="settings-panel">
+    <h2>Simulation Settings</h2>
+    <form [formGroup]="combinedForm" (ngSubmit)="runSimulation()">
+      <!-- Basic Settings -->
+      <div class="section-title">Basic Settings</div>
+      <div class="form-row">
+        <div class="form-group">
+          <label for="initialInvestment">Initial Investment:</label>
+          <input
+            type="number"
+            id="initialInvestment"
+            formControlName="initialInvestment"
+            class="form-control"
+            placeholder="15000"
+          />
+          <div
+            *ngIf="
+              combinedForm.get('initialInvestment')?.invalid &&
+              combinedForm.get('initialInvestment')?.touched
+            "
+            class="error-message"
+          >
+            Initial investment must be at least $1,000
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label for="monthlyIncome">Monthly Income:</label>
+          <input
+            type="number"
+            id="monthlyIncome"
+            formControlName="monthlyIncome"
+            class="form-control"
+            placeholder="2000"
+          />
+          <div
+            *ngIf="
+              combinedForm.get('monthlyIncome')?.invalid &&
+              combinedForm.get('monthlyIncome')?.touched
+            "
+            class="error-message"
+          >
+            Monthly income cannot be negative
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label for="simulationMonths">Simulation Length (months):</label>
+          <input
+            type="number"
+            id="simulationMonths"
+            formControlName="simulationMonths"
+            class="form-control"
+            placeholder="120"
+          />
+        </div>
+
+        <div class="form-group">
+          <label for="maxPersonalExpensePercentage"
+            >Max Personal Expense (% of Monthly Income):</label
+          >
+          <input
+            type="number"
+            id="maxPersonalExpensePercentage"
+            formControlName="maxPersonalExpensePercentage"
+            class="form-control"
+            min="0"
+            max="100"
+            placeholder="50"
+          />
+        </div>
+      </div>
+
+      <!-- Investment Allocation -->
+      <div class="section-title">Investment Allocation (%)</div>
+      <div
+        *ngIf="combinedForm.errors?.['percentagesNotEqual']"
+        class="error-message"
+      >
+        Investment percentages must total exactly 100%
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label for="mortgageNotePercentage">Mortgage Notes %:</label>
+          <input
+            type="number"
+            id="mortgageNotePercentage"
+            formControlName="mortgageNotePercentage"
+            class="form-control"
+            min="0"
+            max="100"
+            placeholder="40"
+          />
+        </div>
+
+        <div class="form-group">
+          <label for="hysaPercentage">HYSA %:</label>
+          <input
+            type="number"
+            id="hysaPercentage"
+            formControlName="hysaPercentage"
+            class="form-control"
+            min="0"
+            max="100"
+            placeholder="40"
+          />
+        </div>
+
+        <div class="form-group">
+          <label for="annuityPercentage">Annuity %:</label>
+          <input
+            type="number"
+            id="annuityPercentage"
+            formControlName="annuityPercentage"
+            class="form-control"
+            min="0"
+            max="100"
+            placeholder="20"
+          />
+        </div>
+      </div>
+
+      <!-- Mortgage Note Settings -->
+      <div class="section-title">Mortgage Note Settings</div>
+      <div class="form-row">
+        <div class="form-group">
+          <label for="mortgageNoteInterestRate">Interest Rate (%):</label>
+          <input
+            type="number"
+            id="mortgageNoteInterestRate"
+            formControlName="mortgageNoteInterestRate"
+            class="form-control"
+            step="0.1"
+            placeholder="12"
+          />
+        </div>
+
+        <div class="form-group">
+          <label for="mortgageNoteTermLength">Term Length (months):</label>
+          <input
+            type="number"
+            id="mortgageNoteTermLength"
+            formControlName="mortgageNoteTermLength"
+            class="form-control"
+            min="1"
+            max="240"
+            placeholder="60"
+          />
+        </div>
+
+        <div class="form-group">
+          <label for="mortgageNoteValueMultiplier">Value Multiplier:</label>
+          <input
+            type="number"
+            id="mortgageNoteValueMultiplier"
+            formControlName="mortgageNoteValueMultiplier"
+            class="form-control"
+            min="1"
+            max="2"
+            step="0.1"
+            placeholder="1.5"
+          />
+        </div>
+
+        <div class="form-group">
+          <label for="maxNoteValue">Max Note Value:</label>
+          <input
+            type="number"
+            id="maxNoteValue"
+            formControlName="maxNoteValue"
+            class="form-control"
+            min="5000"
+            max="500000"
+            placeholder="75000"
+          />
+        </div>
+      </div>
+
+      <!-- HYSA Settings -->
+      <div class="section-title">HYSA Settings</div>
+      <div class="form-row">
+        <div class="form-group">
+          <label for="hysaApy">APY (%):</label>
+          <input
+            type="number"
+            id="hysaApy"
+            formControlName="hysaApy"
+            class="form-control"
+            step="0.1"
+            placeholder="4.5"
+          />
+        </div>
+      </div>
+
+      <!-- Annuity Settings -->
+      <div class="section-title">Annuity Settings</div>
+      <div class="form-row">
+        <div class="form-group">
+          <label for="annuityAnnualRate">Annual Rate (%):</label>
+          <input
+            type="number"
+            id="annuityAnnualRate"
+            formControlName="annuityAnnualRate"
+            class="form-control"
+            step="0.1"
+            placeholder="5"
+          />
+        </div>
+
+        <div class="form-group">
+          <label for="annuityTermLength">Term Length (months):</label>
+          <input
+            type="number"
+            id="annuityTermLength"
+            formControlName="annuityTermLength"
+            class="form-control"
+            min="1"
+            max="360"
+            placeholder="120"
+          />
+        </div>
+      </div>
+
+      <!-- Date Settings -->
+      <div class="section-title">Date Settings</div>
+      <div class="form-row">
+        <div class="form-group">
+          <label for="startMonth">Starting Month:</label>
+          <select
+            id="startMonth"
+            formControlName="startMonth"
+            class="form-control"
+          >
+            <option value="1">January</option>
+            <option value="2">February</option>
+            <option value="3">March</option>
+            <option value="4">April</option>
+            <option value="5">May</option>
+            <option value="6">June</option>
+            <option value="7">July</option>
+            <option value="8">August</option>
+            <option value="9">September</option>
+            <option value="10">October</option>
+            <option value="11">November</option>
+            <option value="12">December</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label for="startYear">Starting Year:</label>
+          <input
+            type="number"
+            id="startYear"
+            formControlName="startYear"
+            class="form-control"
+            min="2020"
+            max="2050"
+            placeholder="2026"
+          />
+        </div>
+      </div>
+
+      <div class="button-group">
+        <button
+          type="submit"
+          class="btn btn-primary"
+          [disabled]="combinedForm.invalid || isRunning"
+        >
+          {{ isRunning ? 'Running...' : 'Run Simulation' }}
+        </button>
+        <button
+          type="button"
+          class="btn btn-secondary"
+          (click)="resetSimulation()"
+          [disabled]="isRunning"
+        >
+          Reset
+        </button>
+        <button
+          type="button"
+          class="btn btn-success"
+          (click)="exportToCSV()"
+          [disabled]="monthlyReports.length === 0"
+        >
+          Export to CSV
+        </button>
+      </div>
+    </form>
+  </div>
+
+  <!-- Results Section -->
+  <div class="results-panel" *ngIf="monthlyReports.length > 0">
+    <h2>Simulation Results</h2>
+
+    <!-- Summary Stats -->
+    <div class="summary-stats">
+      <div class="stat-card">
+        <h3>Final Portfolio Value</h3>
+        <p class="stat-value">
+          {{
+            formatCurrency(
+              getLastReport()?.totalPortfolioValue || 0
+            )
+          }}
+        </p>
+      </div>
+      <div class="stat-card">
+        <h3>Available Cash</h3>
+        <p class="stat-value">
+          {{
+            formatCurrency(
+              getLastReport()?.availableCash || 0
+            )
+          }}
+        </p>
+      </div>
+      <div class="stat-card">
+        <h3>Total Income Added</h3>
+        <p class="stat-value">
+          {{
+            formatCurrency(
+              getLastReport()?.totalIncomeContributed || 0
+            )
+          }}
+        </p>
+      </div>
+      <div class="stat-card profit-stat">
+        <h3>Total Profit Generated</h3>
+        <p class="stat-value">
+          {{
+            formatCurrency(
+              getLastReport()?.totalProfitGenerated || 0
+            )
+          }}
+        </p>
+      </div>
+      <div class="stat-card">
+        <h3>Total Personal Expenses</h3>
+        <p class="stat-value">
+          {{
+            formatCurrency(
+              getLastReport()?.totalPersonalExpenses || 0
+            )
+          }}
+        </p>
+      </div>
+    </div>
+
+    <!-- Investment Mix Overview -->
+    <div class="investment-mix" *ngIf="getLastReport()">
+      <h3>Final Investment Mix</h3>
+      <div class="mix-grid">
+        <div class="mix-card">
+          <h4>Mortgage Notes</h4>
+          <p class="mix-value">
+            {{ formatCurrency(getLastReport()!.investmentMix.mortgageNotesValue) }}
+          </p>
+        </div>
+        <div class="mix-card">
+          <h4>HYSA</h4>
+          <p class="mix-value">
+            {{ formatCurrency(getLastReport()!.investmentMix.hysaValue) }}
+          </p>
+        </div>
+        <div class="mix-card">
+          <h4>Annuities</h4>
+          <p class="mix-value">
+            {{ formatCurrency(getLastReport()!.investmentMix.annuityValue) }}
+          </p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Results Table -->
+    <div class="table-container">
+      <table class="results-table">
+        <thead>
+          <tr>
+            <th>Month</th>
+            <th>Monthly Income</th>
+            <th>Monthly Personal Expense</th>
+            <th>Monthly Interest</th>
+            <th>Monthly Principal</th>
+            <th>Monthly Revenue</th>
+            <th>Available Cash</th>
+            <th>Total Portfolio Value</th>
+            <th>Mortgage Notes</th>
+            <th>HYSA</th>
+            <th>Annuities</th>
+            <th>Total Profit</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngFor="let report of monthlyReports; let i = index">
+            <td>{{ report.monthName }}</td>
+            <td>{{ formatCurrency(report.monthlyIncome) }}</td>
+            <td>{{ formatCurrency(report.monthlyPersonalExpense) }}</td>
+            <td>{{ formatCurrency(report.monthlyInterest) }}</td>
+            <td>{{ formatCurrency(report.monthlyPrincipal) }}</td>
+            <td>{{ formatCurrency(report.monthlyRevenue) }}</td>
+            <td>{{ formatCurrency(report.availableCash) }}</td>
+            <td>{{ formatCurrency(report.totalPortfolioValue) }}</td>
+            <td>{{ formatCurrency(report.investmentMix.mortgageNotesValue) }}</td>
+            <td>{{ formatCurrency(report.investmentMix.hysaValue) }}</td>
+            <td>{{ formatCurrency(report.investmentMix.annuityValue) }}</td>
+            <td>{{ formatCurrency(report.totalProfitGenerated) }}</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>

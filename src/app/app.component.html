@@ -1,2 +1,21 @@
-<app-simulation></app-simulation>
-<router-outlet></router-outlet>
+<div class="app-container">
+  <nav class="navbar">
+    <div class="nav-content">
+      <h1 class="logo">Investment Simulator</h1>
+      <ul class="nav-links">
+        <li>
+          <a routerLink="/simulation" routerLinkActive="active">Single Investment</a>
+        </li>
+        <li>
+          <a routerLink="/combined" routerLinkActive="active">Combined Portfolio</a>
+        </li>
+        <li>
+          <a routerLink="/tracker" routerLinkActive="active">Investment Tracker</a>
+        </li>
+      </ul>
+    </div>
+  </nav>
+  <div class="main-content">
+    <router-outlet></router-outlet>
+  </div>
+</div>
