@@ -7,6 +7,19 @@
     <form [formGroup]="simulationForm" (ngSubmit)="runSimulation()">
       <div class="form-row">
         <div class="form-group">
+          <label for="simulationType">Simulation Type:</label>
+          <select 
+            id="simulationType"
+            formControlName="simulationType"
+            class="form-control">
+            <option value="mortgage-notes">Mortgage Notes</option>
+            <option value="hysa">High Yield Savings Account</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="form-row">
+        <div class="form-group">
           <label for="initialInvestment">Initial Investment:</label>
           <input 
             type="number" 
@@ -35,6 +48,22 @@
         </div>
         
         <div class="form-group">
+          <label for="maxPersonalExpensePercentage">Max Personal Expense (% of Monthly Income):</label>
+          <input 
+            type="number" 
+            id="maxPersonalExpensePercentage"
+            formControlName="maxPersonalExpensePercentage"
+            class="form-control"
+            min="0"
+            max="100"
+            placeholder="50">
+          <div *ngIf="simulationForm.get('maxPersonalExpensePercentage')?.invalid && simulationForm.get('maxPersonalExpensePercentage')?.touched" 
+               class="error-message">
+            Personal expense percentage must be between 0% and 100%
+          </div>
+        </div>
+        
+        <div class="form-group">
           <label for="interestRate">Interest Rate (%):</label>
           <input 
             type="number" 
@@ -46,6 +75,21 @@
           <div *ngIf="simulationForm.get('interestRate')?.invalid && simulationForm.get('interestRate')?.touched" 
                class="error-message">
             Interest rate must be between 0.1% and 50%
+          </div>
+        </div>
+
+        <div class="form-group" *ngIf="simulationForm.get('simulationType')?.value === 'hysa'">
+          <label for="hysaApy">HYSA APY (%):</label>
+          <input 
+            type="number" 
+            id="hysaApy"
+            formControlName="hysaApy"
+            class="form-control"
+            step="0.1"
+            placeholder="4.5">
+          <div *ngIf="simulationForm.get('hysaApy')?.invalid && simulationForm.get('hysaApy')?.touched" 
+               class="error-message">
+            HYSA APY must be between 0.1% and 10%
           </div>
         </div>
         
@@ -118,7 +162,7 @@
           </div>
         </div>
 
-        <div class="form-group">
+        <div class="form-group" *ngIf="simulationForm.get('simulationType')?.value === 'mortgage-notes'">
           <label for="noteValueMultiplier">Rate of note value increase:</label>
           <input 
             type="number" 
@@ -131,6 +175,22 @@
           <div *ngIf="simulationForm.get('noteValueMultiplier')?.invalid && simulationForm.get('noteValueMultiplier')?.touched" 
                class="error-message">
             Rate of note value increase must be between 1 and 2
+          </div>
+        </div>
+
+        <div class="form-group" *ngIf="simulationForm.get('simulationType')?.value === 'mortgage-notes'">
+          <label for="noteTermLength">Note Term Length (months):</label>
+          <input 
+            type="number" 
+            id="noteTermLength"
+            formControlName="noteTermLength"
+            class="form-control"
+            min="1"
+            max="240"
+            placeholder="60">
+          <div *ngIf="simulationForm.get('noteTermLength')?.invalid && simulationForm.get('noteTermLength')?.touched" 
+               class="error-message">
+            Note term length must be between 1 and 240 months
           </div>
         </div>
       </div>
@@ -148,6 +208,13 @@
           (click)="resetSimulation()"
           [disabled]="isRunning">
           Reset
+        </button>
+        <button 
+          type="button" 
+          class="btn btn-success"
+          (click)="exportToCSV()"
+          [disabled]="monthlyReports.length === 0">
+          Export to CSV
         </button>
       </div>
     </form>
@@ -177,13 +244,17 @@
         <h3>Final Cash Available</h3>
         <p class="stat-value">{{ formatCurrency((monthlyReports.length > 0 ? monthlyReports[monthlyReports.length - 1].availableCash : 0) || 0) }}</p>
       </div>
-      <div class="stat-card">
+      <div class="stat-card" *ngIf="simulationForm.get('simulationType')?.value === 'mortgage-notes'">
         <h3>Total Active Notes</h3>
         <p class="stat-value">{{ (monthlyReports.length > 0 ? monthlyReports[monthlyReports.length - 1].totalNotes : 0) || 0 }}</p>
       </div>
       <div class="stat-card income-stat">
         <h3>Total Income Added</h3>
         <p class="stat-value">{{ formatCurrency((monthlyReports.length > 0 ? monthlyReports[monthlyReports.length - 1].totalIncomeContributed : 0) || 0) }}</p>
+      </div>
+      <div class="stat-card">
+        <h3>Total Personal Expenses</h3>
+        <p class="stat-value">{{ formatCurrency((monthlyReports.length > 0 ? monthlyReports[monthlyReports.length - 1].totalPersonalExpenses : 0) || 0) }}</p>
       </div>
       <div class="stat-card profit-stat">
         <h3>Total Profit Generated (Interest Only)</h3>
@@ -193,7 +264,7 @@
         <h3>Last Month Interest</h3>
         <p class="stat-value">{{ formatCurrency((monthlyReports.length > 0 ? monthlyReports[monthlyReports.length - 1].monthlyInterest : 0) || 0) }}</p>
       </div>
-      <div class="stat-card">
+      <div class="stat-card" *ngIf="simulationForm.get('simulationType')?.value === 'mortgage-notes'">
         <h3>Last Month Principal</h3>
         <p class="stat-value">{{ formatCurrency((monthlyReports.length > 0 ? monthlyReports[monthlyReports.length - 1].monthlyPrincipal : 0) || 0) }}</p>
       </div>
@@ -202,9 +273,11 @@
     <div class="table-container">
       <table class="results-table">
         <thead>
-          <tr>
+          <tr *ngIf="simulationForm.get('simulationType')?.value === 'mortgage-notes'">
             <th>Month</th>
             <th>Active Notes</th>
+            <th>Cashflow</th>
+            <th>Monthly Personal Expense</th>
             <th>Monthly Revenue</th>
             <th>Interest</th>
             <th>Principal</th>
@@ -212,31 +285,58 @@
             <th>Next Note Value</th>
             <th>Portfolio Value</th>
             <th>Total Income Added</th>
+            <th>Total Personal Expenses</th>
             <th>Total Profit Generated (Interest)</th>
             <th>Current Note Being Repaid</th>
+          </tr>
+          <tr *ngIf="simulationForm.get('simulationType')?.value === 'hysa'">
+            <th>Month</th>
+            <th>Monthly Income</th>
+            <th>Monthly Personal Expense</th>
+            <th>Monthly Interest</th>
+            <th>Balance</th>
+            <th>Total Income Added</th>
+            <th>Total Personal Expenses</th>
+            <th>Total Interest Generated</th>
           </tr>
         </thead>
         <tbody>
           <tr *ngFor="let report of monthlyReports; let i = index" 
-              [class.highlight]="i % 12 === 0">
-            <td>{{ report.monthName }}</td>
-            <td>{{ report.totalNotes }}</td>
-            <td>{{ formatCurrency(report.monthlyRevenue) }}</td>
-            <td>{{ formatCurrency(report.monthlyInterest) }}</td>
-            <td>{{ formatCurrency(report.monthlyPrincipal) }}</td>
-            <td>{{ formatCurrency(report.availableCash) }}</td>
-            <td>{{ formatCurrency(report.nextNoteValue) }}</td>
-            <td>{{ formatCurrency(report.totalPortfolioValue) }}</td>
-            <td>{{ formatCurrency(report.totalIncomeContributed) }}</td>
-            <td>{{ formatCurrency(report.totalProfitGenerated) }}</td>
-            <td>
-              <span *ngIf="report.currentNoteBeingRepaid; else noNote">
-                {{ report.currentNoteBeingRepaid.id }}<br>
-                <small>Recovered: {{ formatCurrency(report.currentNoteBeingRepaid.amountRecovered || 0) }} / 
-                {{ formatCurrency(report.currentNoteBeingRepaid.totalValue) }}</small>
-              </span>
-              <ng-template #noNote>-</ng-template>
-            </td>
+              [class.highlight]="i % 12 === 0"
+              [ngSwitch]="simulationForm.get('simulationType')?.value">
+            <ng-container *ngSwitchCase="'mortgage-notes'">
+              <td>{{ report.monthName }}</td>
+              <td>{{ report.totalNotes }}</td>
+              <td>{{ formatCurrency(report.monthlyIncome) }}</td>
+              <td>{{ formatCurrency(report.monthlyPersonalExpense) }}</td>
+              <td>{{ formatCurrency(report.monthlyRevenue) }}</td>
+              <td>{{ formatCurrency(report.monthlyInterest) }}</td>
+              <td>{{ formatCurrency(report.monthlyPrincipal) }}</td>
+              <td>{{ formatCurrency(report.availableCash) }}</td>
+              <td>{{ formatCurrency(report.nextNoteValue) }}</td>
+              <td>{{ formatCurrency(report.totalPortfolioValue) }}</td>
+              <td>{{ formatCurrency(report.totalIncomeContributed) }}</td>
+              <td>{{ formatCurrency(report.totalPersonalExpenses) }}</td>
+              <td>{{ formatCurrency(report.totalProfitGenerated) }}</td>
+              <td>
+                <span *ngIf="report.currentNoteBeingRepaid; else noNote">
+                  {{ report.currentNoteBeingRepaid.id }}<br>
+                  <small>Recovered: {{ formatCurrency(report.currentNoteBeingRepaid.amountRecovered || 0) }} / 
+                  {{ formatCurrency(report.currentNoteBeingRepaid.totalValue) }}</small>
+                </span>
+                <ng-template #noNote>-</ng-template>
+              </td>
+            </ng-container>
+            <ng-container *ngSwitchCase="'hysa'">
+              <td>{{ report.monthName }}</td>
+              <td>{{ formatCurrency(report.monthlyIncome) }}</td>
+              <td>{{ formatCurrency(report.monthlyPersonalExpense) }}</td>
+              <td>{{ formatCurrency(report.monthlyInterest) }}</td>
+              <td>{{ formatCurrency(report.availableCash) }}</td>
+              <td>{{ formatCurrency(report.totalIncomeContributed) }}</td>
+              <td>{{ formatCurrency(report.totalPersonalExpenses) }}</td>
+              <td>{{ formatCurrency(report.totalProfitGenerated) }}</td>
+            </ng-container>
           </tr>
         </tbody>
       </table>
@@ -244,7 +344,7 @@
   </div>
 
   <!-- Active Notes Details -->
-  <div class="notes-panel" *ngIf="monthlyReports.length > 0">
+  <div class="notes-panel" *ngIf="monthlyReports.length > 0 && simulationForm.get('simulationType')?.value === 'mortgage-notes'">
     <h2>Current Active Notes (Month {{ monthlyReports.length }})</h2>
     <div *ngIf="getLastReport()?.activeNotes?.length === 0" class="no-notes">
       No active notes remaining

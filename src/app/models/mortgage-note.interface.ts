@@ -18,6 +18,10 @@ export interface SimulationSettings {
   noteValueMultiplier: number; // 1.5x increase
   startMonth: number; // starting month (1-12)
   startYear: number; // starting year
+  noteTermLength: number; // length of each note in months
+  maxPersonalExpensePercentage: number; // maximum percentage of monthly income for personal expenses (0-1)
+  simulationType: 'mortgage-notes' | 'hysa'; // type of simulation
+  hysaApy: number; // HYSA annual percentage yield (0-1)
 }
 
 export interface MonthlyReport {
@@ -30,9 +34,11 @@ export interface MonthlyReport {
   monthlyRevenue: number; // total of interest + principal from notes
   monthlyInterest: number; // interest portion only
   monthlyPrincipal: number; // principal portion only
+  monthlyPersonalExpense: number; // random personal expense this month
   availableCash: number;
   nextNoteValue: number;
   totalPortfolioValue: number;
   totalIncomeContributed: number; // cumulative personal income added
   totalProfitGenerated: number; // cumulative profit from note interest
+  totalPersonalExpenses: number; // cumulative personal expenses
 }

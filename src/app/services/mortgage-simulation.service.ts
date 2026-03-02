@@ -20,7 +20,11 @@ export class MortgageSimulationService {
     maxNoteValue: 1000000,
     noteValueMultiplier: 1.5,
     startMonth: new Date().getMonth() + 1, // current month (1-12)
-    startYear: new Date().getFullYear() // current year
+    startYear: new Date().getFullYear(), // current year
+    noteTermLength: 60, // default note term length in months
+    maxPersonalExpensePercentage: 0.5, // maximum percentage of monthly income for personal expenses (50%)
+    simulationType: 'mortgage-notes', // default to mortgage notes
+    hysaApy: 0.045 // default 4.5% APY for high yield savings account
   };
 
 
@@ -50,6 +54,15 @@ export class MortgageSimulationService {
     this.isSimulationRunning.next(true);
     
     const config = { ...this.defaultSettings, ...settings };
+    
+    if (config.simulationType === 'hysa') {
+      return this.runHYSASimulation(config);
+    } else {
+      return this.runMortgageNotesSimulation(config);
+    }
+  }
+
+  private runMortgageNotesSimulation(config: SimulationSettings): Observable<MonthlyReport[]> {
     const results: MonthlyReport[] = [];
     
     let availableCash = config.initialInvestment;
@@ -61,11 +74,17 @@ export class MortgageSimulationService {
     let fullyRecoveredNoteIds: Set<string> = new Set();
     let totalIncomeContributed = 0;
     let totalProfitGenerated = 0;
+    let totalPersonalExpenses = 0;
 
     for (let month = 1; month <= config.simulationMonths; month++) {
       // Add monthly income
       availableCash += config.monthlyIncome;
       totalIncomeContributed += config.monthlyIncome;
+
+      // Deduct random personal expenses (between $0 and maxPersonalExpensePercentage of monthly income)
+      const monthlyPersonalExpense = Math.random() * (config.monthlyIncome * config.maxPersonalExpensePercentage);
+      availableCash -= monthlyPersonalExpense;
+      totalPersonalExpenses += monthlyPersonalExpense;
 
       // Calculate monthly interest and principal from existing notes
       let monthlyInterest = 0;
@@ -145,7 +164,8 @@ export class MortgageSimulationService {
           `NOTE-${noteCounter + 1}`,
           nextNoteValue,
           config.interestRate,
-          month
+          month,
+          config.noteTermLength
         );
         
         // Actually purchase the note
@@ -163,7 +183,7 @@ export class MortgageSimulationService {
         // Only increase if current note being repaid can be recovered in 3 months
         if (currentNoteBeingRepaid !== null) {
           const futureMonthlyCashFlow = config.monthlyIncome + monthlyPrincipal + monthlyInterest + potentialNote.monthlyPayment;
-          if ((futureMonthlyCashFlow * 1) >= currentNoteBeingRepaid.totalValue && nextNoteValue < config.maxNoteValue) {
+          if ((futureMonthlyCashFlow * 3) >= currentNoteBeingRepaid.totalValue && nextNoteValue < config.maxNoteValue) {
             nextNoteValue = Math.min(nextNoteValue * config.noteValueMultiplier, config.maxNoteValue);
           }
         }
@@ -184,11 +204,13 @@ export class MortgageSimulationService {
         monthlyRevenue: monthlyInterest + monthlyPrincipal,
         monthlyInterest,
         monthlyPrincipal,
+        monthlyPersonalExpense,
         availableCash,
         nextNoteValue,
         totalPortfolioValue: notes.reduce((sum, note) => sum + note.totalValue, 0),
         totalIncomeContributed,
-        totalProfitGenerated
+        totalProfitGenerated,
+        totalPersonalExpenses
       };
       
       results.push(monthlyReport);
@@ -199,8 +221,58 @@ export class MortgageSimulationService {
     return this.simulationResults$;
   }
 
-  private createMortgageNote(id: string, totalValue: number, interestRate: number, purchaseMonth: number): MortgageNote {
-    const term = 36; // Default 36 months
+  private runHYSASimulation(config: SimulationSettings): Observable<MonthlyReport[]> {
+    const results: MonthlyReport[] = [];
+    
+    let balance = config.initialInvestment;
+    let totalIncomeContributed = 0;
+    let totalProfitGenerated = 0;
+    let totalPersonalExpenses = 0;
+    const monthlyRate = config.hysaApy / 12; // Convert annual to monthly
+
+    for (let month = 1; month <= config.simulationMonths; month++) {
+      // Add monthly income
+      balance += config.monthlyIncome;
+      totalIncomeContributed += config.monthlyIncome;
+
+      // Deduct random personal expenses (between $0 and maxPersonalExpensePercentage of monthly income)
+      const monthlyPersonalExpense = Math.random() * (config.monthlyIncome * config.maxPersonalExpensePercentage);
+      balance -= monthlyPersonalExpense;
+      totalPersonalExpenses += monthlyPersonalExpense;
+
+      // Calculate and add monthly interest based on current balance
+      const monthlyInterest = balance * monthlyRate;
+      balance += monthlyInterest;
+      totalProfitGenerated += monthlyInterest;
+
+      const monthlyReport: MonthlyReport = {
+        month,
+        monthName: this.getMonthName(month, config.startMonth, config.startYear),
+        totalNotes: 0,
+        activeNotes: [],
+        monthlyIncome: config.monthlyIncome,
+        monthlyRevenue: monthlyInterest,
+        monthlyInterest,
+        monthlyPrincipal: 0,
+        monthlyPersonalExpense,
+        availableCash: balance,
+        nextNoteValue: 0,
+        totalPortfolioValue: 0,
+        totalIncomeContributed,
+        totalProfitGenerated,
+        totalPersonalExpenses
+      };
+
+      results.push(monthlyReport);
+    }
+
+    this.simulationResults.next(results);
+    this.isSimulationRunning.next(false);
+    return this.simulationResults$;
+  }
+
+  private createMortgageNote(id: string, totalValue: number, interestRate: number, purchaseMonth: number, term: number): MortgageNote {
+    // const term = 60; // Default 5 years
     const monthlyRate = interestRate / 12;
     
     // Calculate monthly payment using standard loan payment formula
