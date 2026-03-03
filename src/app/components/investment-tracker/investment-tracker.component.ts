@@ -24,11 +24,16 @@ import {
 })
 export class InvestmentTrackerComponent implements OnInit, OnDestroy {
   investmentForm: FormGroup;
+  cashflowForm: FormGroup;
   investments: TrackedInvestment[] = [];
   currentSnapshot: TrackedInvestorSnapshot | null = null;
   netWorthHistory: NetWorthHistory[] = [];
   currentMonth: number = 0;
   trackerStartDate: Date = new Date();
+  cashBalance: number = 0;
+  monthlyIncome: number = 0;
+  investmentError: string = '';
+  addCashAmount: number = 0;
   private subscriptions = new Subscription();
 
   constructor(
@@ -43,6 +48,12 @@ export class InvestmentTrackerComponent implements OnInit, OnDestroy {
       termLengthMonths: [60, [Validators.required, Validators.min(1), Validators.max(360)]],
       notes: ['']
     });
+
+    this.cashflowForm = this.fb.group({
+      monthlyIncome: [5000, [Validators.required, Validators.min(0)]]
+    });
+
+    this.addCashAmount = 0;
   }
 
   ngOnInit(): void {
@@ -61,6 +72,19 @@ export class InvestmentTrackerComponent implements OnInit, OnDestroy {
     this.subscriptions.add(
       this.trackerService.netWorthHistory$.subscribe(history => {
         this.netWorthHistory = history;
+      })
+    );
+
+    this.subscriptions.add(
+      this.trackerService.cashBalance$.subscribe(balance => {
+        this.cashBalance = balance;
+      })
+    );
+
+    this.subscriptions.add(
+      this.trackerService.monthlyIncome$.subscribe(income => {
+        this.monthlyIncome = income;
+        this.cashflowForm.patchValue({ monthlyIncome: income });
       })
     );
 
@@ -109,6 +133,16 @@ export class InvestmentTrackerComponent implements OnInit, OnDestroy {
   addInvestment(): void {
     if (this.investmentForm.valid) {
       const formValue = this.investmentForm.value;
+      
+      // Check if there's sufficient cash
+      if (formValue.investmentAmount > this.cashBalance) {
+        this.investmentError = `Insufficient cash. You need $${formValue.investmentAmount.toLocaleString()} but only have $${this.cashBalance.toLocaleString()} available.`;
+        // Clear error after 5 seconds
+        setTimeout(() => this.investmentError = '', 5000);
+        return;
+      }
+      
+      this.investmentError = ''; // Clear any previous errors
       this.trackerService.addInvestment({
         type: formValue.type,
         investmentAmount: formValue.investmentAmount,
@@ -136,6 +170,13 @@ export class InvestmentTrackerComponent implements OnInit, OnDestroy {
   deleteInvestment(id: string): void {
     if (confirm('Are you sure you want to delete this investment?')) {
       this.trackerService.deleteInvestment(id);
+    }
+  }
+
+  setMonthlyIncome(): void {
+    if (this.cashflowForm.valid) {
+      const income = this.cashflowForm.get('monthlyIncome')?.value;
+      this.trackerService.setMonthlyIncome(income);
     }
   }
 
@@ -277,13 +318,13 @@ export class InvestmentTrackerComponent implements OnInit, OnDestroy {
         const dataLines = lines.slice(1);
         let importedCount = 0;
 
+        const importedInvestments: Omit<TrackedInvestment, 'id'>[] = [];
         dataLines.forEach(line => {
           try {
             // Simple CSV parsing (handles quoted fields)
             const fields: string[] = [];
             let current = '';
             let inQuotes = false;
-
             for (let i = 0; i < line.length; i++) {
               const char = line[i];
               if (char === '"') {
@@ -301,15 +342,12 @@ export class InvestmentTrackerComponent implements OnInit, OnDestroy {
               }
             }
             fields.push(current);
-
             if (fields.length < 11) return;
-
             const typeMap: { [key: string]: 'mortgage-note' | 'hysa' | 'annuity' } = {
               'Mortgage Note': 'mortgage-note',
               'HYSA': 'hysa',
               'Annuity': 'annuity'
             };
-
             const type = typeMap[fields[0].trim()] || 'mortgage-note';
             const investmentAmount = parseFloat(fields[1]);
             const interestRate = parseFloat(fields[4]) / 100;
@@ -318,8 +356,7 @@ export class InvestmentTrackerComponent implements OnInit, OnDestroy {
             const monthlyPayment = parseFloat(fields[3]);
             const purchaseDate = new Date(fields[9]);
             const notes = fields[10];
-
-            this.trackerService.addInvestment({
+            importedInvestments.push({
               type,
               investmentAmount,
               interestRate,
@@ -332,12 +369,14 @@ export class InvestmentTrackerComponent implements OnInit, OnDestroy {
               status: (fields[8] as 'active' | 'completed') || 'active',
               notes
             });
-
             importedCount++;
           } catch (error) {
             console.error('Error parsing CSV line:', error);
           }
         });
+        if (importedInvestments.length > 0) {
+          this.trackerService.importInvestments(importedInvestments);
+        }
 
         if (importedCount > 0) {
           alert(`Successfully imported ${importedCount} investment(s)`);
@@ -352,5 +391,12 @@ export class InvestmentTrackerComponent implements OnInit, OnDestroy {
     };
 
     reader.readAsText(file);
+  }
+
+  addCash(): void {
+    if (this.addCashAmount > 0) {
+      this.trackerService.addCash(this.addCashAmount);
+      this.addCashAmount = 0;
+    }
   }
 }

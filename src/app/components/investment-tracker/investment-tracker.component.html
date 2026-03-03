@@ -6,9 +6,64 @@
     <h3>{{ getCurrentMonthLabel() }}</h3>
   </div>
 
+  <!-- Monthly Cashflow Configuration -->
+  <div class="cashflow-panel">
+    <h2>Monthly Cashflow Configuration</h2>
+    <form [formGroup]="cashflowForm" class="cashflow-form">
+      <div class="cashflow-grid">
+        <div class="form-group">
+          <label for="monthlyIncome">Monthly Income (from paycheck) ($):</label>
+          <input
+            type="number"
+            id="monthlyIncome"
+            formControlName="monthlyIncome"
+            class="form-control"
+            min="0"
+            step="100"
+            placeholder="5000"
+          />
+        </div>
+        <button type="button" class="btn btn-primary" (click)="setMonthlyIncome()" [disabled]="cashflowForm.invalid">
+          Set Monthly Income
+        </button>
+      </div>
+      <p class="cashflow-info">
+        This amount will be added to your available cash each month when you process a month advance.
+      </p>
+    </form>
+  </div>
+
+  <!-- Available Cash Display -->
+  <div class="cash-display-panel">
+    <div class="cash-card">
+      <h3>Available Cash</h3>
+      <p class="cash-amount">{{ formatCurrency(cashBalance) }}</p>
+      <p class="cash-monthly">+{{ formatCurrency(monthlyIncome) }}/month</p>
+    </div>
+  </div>
+
+    <!-- Add Cash Form -->
+  <div class="form-panel" style="margin-bottom: 20px;">
+    <form class="form-row" (submit)="$event.preventDefault(); addCash();">
+      <div class="form-group">
+        <label for="addCashAmount">Add Cash</label>
+        <input id="addCashAmount" type="number" [(ngModel)]="addCashAmount" name="addCashAmount" min="1" class="form-control" placeholder="Amount" />
+      </div>
+      <div class="form-group" style="align-self: flex-end;">
+        <button type="submit" class="btn btn-primary">Add</button>
+      </div>
+    </form>
+  </div>
+
   <!-- Add Investment Form -->
   <div class="form-panel">
     <h2>Add New Investment</h2>
+    
+    <!-- Error Message -->
+    <div class="error-message" *ngIf="investmentError">
+      {{ investmentError }}
+    </div>
+    
     <form [formGroup]="investmentForm" (ngSubmit)="addInvestment()">
       <div class="form-row">
         <div class="form-group">
@@ -140,6 +195,18 @@
       <div class="summary-card highlight">
         <h3>Net Worth</h3>
         <p class="summary-value">{{ formatCurrency(currentSnapshot.netWorth) }}</p>
+      </div>
+      <div class="summary-card cash-card">
+        <h3>Available Cash</h3>
+        <p class="summary-value cash">{{ formatCurrency(currentSnapshot.cashBalance) }}</p>
+      </div>
+      <div class="summary-card">
+        <h3>Total Cashflow Added</h3>
+        <p class="summary-value">{{ formatCurrency(currentSnapshot.totalCashflowAdded) }}</p>
+      </div>
+      <div class="summary-card">
+        <h3>Investment Returns Added</h3>
+        <p class="summary-value returns">{{ formatCurrency(currentSnapshot.totalInvestmentReturns) }}</p>
       </div>
       <div class="summary-card">
         <h3>Active Investments</h3>

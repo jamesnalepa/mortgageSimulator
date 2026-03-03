@@ -10,19 +10,53 @@ import {
   providedIn: 'root'
 })
 export class InvestmentTrackerService {
+      /** Quickly add cash to available balance */
+      addCash(amount: number): void {
+        if (amount <= 0) return;
+        const newBalance = this.cashBalance.value + amount;
+        this.cashBalance.next(newBalance);
+        this.updateSnapshots();
+        this.saveToLocalStorage();
+      }
+    /** Bulk import investments without deducting cash */
+    importInvestments(investments: Omit<TrackedInvestment, 'id'>[]): void {
+      const currentInvestments = this.investments.value;
+      const imported = investments.map(inv => ({
+        id: `INV-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+        ...inv
+      }));
+      this.investments.next([...currentInvestments, ...imported]);
+      this.updateSnapshots();
+      this.saveToLocalStorage();
+    }
   private investments = new BehaviorSubject<TrackedInvestment[]>([]);
   private snapshots = new BehaviorSubject<TrackedInvestorSnapshot[]>([]);
   private netWorthHistory = new BehaviorSubject<NetWorthHistory[]>([]);
+  private cashBalance = new BehaviorSubject<number>(0);
+  private monthlyIncome = new BehaviorSubject<number>(0);
+  private totalCashflowAdded = new BehaviorSubject<number>(0);
+  private totalInvestmentReturns = new BehaviorSubject<number>(0);
 
   public investments$ = this.investments.asObservable();
   public snapshots$ = this.snapshots.asObservable();
   public netWorthHistory$ = this.netWorthHistory.asObservable();
+  public cashBalance$ = this.cashBalance.asObservable();
+  public monthlyIncome$ = this.monthlyIncome.asObservable();
+  public totalCashflowAdded$ = this.totalCashflowAdded.asObservable();
+  public totalInvestmentReturns$ = this.totalInvestmentReturns.asObservable();
 
   constructor() {
     this.loadFromLocalStorage();
   }
 
   addInvestment(investment: Omit<TrackedInvestment, 'id'>): void {
+    // Check if there's sufficient cash for this investment
+    const currentCash = this.cashBalance.value;
+    if (investment.investmentAmount > currentCash) {
+      console.warn(`Insufficient cash balance. Need $${investment.investmentAmount}, have $${currentCash}`);
+      return;
+    }
+
     const id = `INV-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
     const newInvestment: TrackedInvestment = {
       id,
@@ -31,6 +65,11 @@ export class InvestmentTrackerService {
 
     const currentInvestments = this.investments.value;
     this.investments.next([...currentInvestments, newInvestment]);
+    
+    // Deduct investment amount from available cash
+    const newCashBalance = currentCash - investment.investmentAmount;
+    this.cashBalance.next(newCashBalance);
+    
     this.updateSnapshots();
     this.saveToLocalStorage();
   }
@@ -54,29 +93,65 @@ export class InvestmentTrackerService {
     this.saveToLocalStorage();
   }
 
+  setMonthlyIncome(amount: number): void {
+    if (amount < 0) {
+      console.warn('Monthly income cannot be negative');
+      return;
+    }
+    this.monthlyIncome.next(amount);
+    this.saveToLocalStorage();
+  }
+
+  getMonthlyIncome(): number {
+    return this.monthlyIncome.value;
+  }
+
+  getCashBalance(): number {
+    return this.cashBalance.value;
+  }
+
+  getTotalCashflowAdded(): number {
+    return this.totalCashflowAdded.value;
+  }
+
+  getTotalInvestmentReturns(): number {
+    return this.totalInvestmentReturns.value;
+  }
+
   processMonthlyAccrual(): void {
     const currentInvestments = this.investments.value;
     const now = new Date();
+    let totalMonthlyReturns = 0; // Track total returns (principal + interest) from investments
 
     const updated = currentInvestments.map(inv => {
       if (inv.status === 'completed') {
         return inv;
       }
 
-      // Calculate monthly interest using proper APY compounding formula
-      // For HYSA/Annuities: monthly rate = (1 + APY)^(1/12) - 1
-      // For Mortgage Notes: uses amortization (handled separately)
-      let monthlyRate: number;
+      let monthlyInterest = 0;
+      let monthlyPrincipal = 0;
+      let newBalance = inv.currentBalance;
+
       if (inv.type === 'mortgage-note') {
-        // Mortgage notes use amortization formula (simple interest on remaining balance)
-        monthlyRate = inv.interestRate / 12;
+        // Mortgage notes: monthly payment includes both principal and interest
+        // Interest = current balance * (annual rate / 12)
+        // Principal = monthly payment - interest
+        // Balance decreases as principal is paid back
+        const monthlyRate = inv.interestRate / 12;
+        monthlyInterest = inv.currentBalance * monthlyRate;
+        monthlyPrincipal = inv.monthlyPayment - monthlyInterest;
+        newBalance = Math.max(0, inv.currentBalance - monthlyPrincipal);
       } else {
-        // HYSA and Annuities use compound APY formula
-        monthlyRate = Math.pow(1 + inv.interestRate, 1/12) - 1;
+        // HYSA
+        const monthlyRate = Math.pow(1 + inv.interestRate, 1/12) - 1;
+        monthlyInterest = inv.currentBalance * monthlyRate;
+        monthlyPrincipal = inv.monthlyPayment - monthlyInterest;
+        newBalance = Math.max(0, inv.currentBalance - monthlyPrincipal);
       }
 
-      const monthlyInterest = inv.currentBalance * monthlyRate;
-      const newBalance = inv.currentBalance + monthlyInterest;
+      const totalMonthlyReturn = monthlyInterest + monthlyPrincipal;
+      totalMonthlyReturns += totalMonthlyReturn; // Add both to total returns
+      
       const monthsRemaining = Math.max(0, inv.monthsRemaining - 1);
 
       return {
@@ -89,6 +164,23 @@ export class InvestmentTrackerService {
     });
 
     this.investments.next(updated);
+    
+    // Add monthly income from paycheck to cash balance
+    const monthlyIncomeAmount = this.monthlyIncome.value;
+    
+    // Add both monthly income AND investment returns (principal + interest) to cash balance
+    const totalCashAddition = monthlyIncomeAmount + totalMonthlyReturns;
+    const newCashBalance = this.cashBalance.value + totalCashAddition;
+    this.cashBalance.next(newCashBalance);
+    
+    // Update total cashflow added (only from actual paycheck income, not investment returns)
+    const newTotalCashflow = this.totalCashflowAdded.value + monthlyIncomeAmount;
+    this.totalCashflowAdded.next(newTotalCashflow);
+    
+    // Track total investment returns accumulated (principal + interest combined)
+    const newTotalReturns = this.totalInvestmentReturns.value + totalMonthlyReturns;
+    this.totalInvestmentReturns.next(newTotalReturns);
+    
     this.updateSnapshots();
     this.saveToLocalStorage();
   }
@@ -121,13 +213,19 @@ export class InvestmentTrackerService {
       (sum, i) => sum + i.totalInterestEarned,
       0
     );
+    const currentCash = this.cashBalance.value;
+    const totalCashflow = this.totalCashflowAdded.value;
+    const totalReturns = this.totalInvestmentReturns.value;
 
     const snapshot: TrackedInvestorSnapshot = {
       date: now,
       totalInvested,
       totalBalance,
       totalInterestEarned,
-      netWorth: totalBalance - totalInvested + totalInterestEarned,
+      cashBalance: currentCash,
+      totalCashflowAdded: totalCashflow,
+      totalInvestmentReturns: totalReturns,
+        netWorth: totalBalance + currentCash,
       activeInvestments: investments.filter(i => i.status === 'active').length,
       completedInvestments: investments.filter(i => i.status === 'completed')
         .length,
@@ -147,7 +245,10 @@ export class InvestmentTrackerService {
       date: now,
       netWorth: snapshot.netWorth,
       totalBalance: snapshot.totalBalance,
-      totalInvested: snapshot.totalInvested
+      totalInvested: snapshot.totalInvested,
+      cashBalance: currentCash,
+      totalCashflowAdded: totalCashflow,
+      totalInvestmentReturns: totalReturns
     };
     this.netWorthHistory.next([...currentHistory, historyEntry]);
   }
@@ -173,6 +274,9 @@ export class InvestmentTrackerService {
     this.investments.next([]);
     this.snapshots.next([]);
     this.netWorthHistory.next([]);
+    this.cashBalance.next(0);
+    this.totalCashflowAdded.next(0);
+    this.totalInvestmentReturns.next(0);
     this.saveToLocalStorage();
   }
 
@@ -184,7 +288,11 @@ export class InvestmentTrackerService {
       const data = {
         investments: this.investments.value,
         snapshots: this.snapshots.value,
-        netWorthHistory: this.netWorthHistory.value
+        netWorthHistory: this.netWorthHistory.value,
+        cashBalance: this.cashBalance.value,
+        monthlyIncome: this.monthlyIncome.value,
+        totalCashflowAdded: this.totalCashflowAdded.value,
+        totalInvestmentReturns: this.totalInvestmentReturns.value
       };
       localStorage.setItem('investmentTrackerData', JSON.stringify(data));
     } catch (e) {
@@ -217,6 +325,10 @@ export class InvestmentTrackerService {
         this.investments.next(investments);
         this.snapshots.next(snapshots);
         this.netWorthHistory.next(netWorthHistory);
+        this.cashBalance.next(parsed.cashBalance || 0);
+        this.monthlyIncome.next(parsed.monthlyIncome || 0);
+        this.totalCashflowAdded.next(parsed.totalCashflowAdded || 0);
+        this.totalInvestmentReturns.next(parsed.totalInvestmentReturns || 0);
       }
     } catch (e) {
       console.error('Failed to load from local storage', e);

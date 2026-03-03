@@ -150,7 +150,10 @@ export interface TrackedInvestorSnapshot {
   totalInvested: number; // total amount invested across all investments
   totalBalance: number; // current total value of all investments
   totalInterestEarned: number; // cumulative interest from all investments
-  netWorth: number; // totalBalance - initial capital spent
+  cashBalance: number; // current available cash
+  totalCashflowAdded: number; // cumulative monthly income (paycheck) added
+  totalInvestmentReturns: number; // cumulative investment returns added to cash
+  netWorth: number; // (totalBalance + cashBalance) - initial capital spent
   activeInvestments: number; // count of active investments
   completedInvestments: number; // count of completed investments
   investmentsByType: {
@@ -180,4 +183,7 @@ export interface NetWorthHistory {
   netWorth: number;
   totalBalance: number;
   totalInvested: number;
+  cashBalance: number;
+  totalCashflowAdded: number;
+  totalInvestmentReturns: number;
 }
