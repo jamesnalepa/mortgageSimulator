@@ -36,6 +36,8 @@ export class InvestmentTrackerService {
   private monthlyIncome = new BehaviorSubject<number>(0);
   private totalCashflowAdded = new BehaviorSubject<number>(0);
   private totalInvestmentReturns = new BehaviorSubject<number>(0);
+  private targetPrice = new BehaviorSubject<number>(5000);
+  private currentMonth = new BehaviorSubject<number>(0);
 
   public investments$ = this.investments.asObservable();
   public snapshots$ = this.snapshots.asObservable();
@@ -44,6 +46,8 @@ export class InvestmentTrackerService {
   public monthlyIncome$ = this.monthlyIncome.asObservable();
   public totalCashflowAdded$ = this.totalCashflowAdded.asObservable();
   public totalInvestmentReturns$ = this.totalInvestmentReturns.asObservable();
+  public targetPrice$ = this.targetPrice.asObservable();
+  public currentMonth$ = this.currentMonth.asObservable();
 
   constructor() {
     this.loadFromLocalStorage();
@@ -69,6 +73,9 @@ export class InvestmentTrackerService {
     // Deduct investment amount from available cash
     const newCashBalance = currentCash - investment.investmentAmount;
     this.cashBalance.next(newCashBalance);
+    
+    // Update target price if months to next purchase is <= 2
+    this.updateTargetPriceIfNeeded();
     
     this.updateSnapshots();
     this.saveToLocalStorage();
@@ -118,6 +125,73 @@ export class InvestmentTrackerService {
     return this.totalInvestmentReturns.value;
   }
 
+  getTargetPrice(): number {
+    return this.targetPrice.value;
+  }
+
+  setTargetPrice(price: number): void {
+    if (price > 0) {
+      this.targetPrice.next(price);
+      this.saveToLocalStorage();
+    }
+  }
+
+  setCurrentMonth(month: number): void {
+    if (month >= 0) {
+      this.currentMonth.next(month);
+      this.saveToLocalStorage();
+    }
+  }
+
+  getCurrentMonth(): number {
+    return this.currentMonth.value;
+  }
+
+  private updateTargetPriceIfNeeded(): void {
+    const monthsUntilNextPurchase = this.calculateMonthsUntilNextPurchase();
+    if (monthsUntilNextPurchase > 0 && monthsUntilNextPurchase <= 2) {
+      const currentTarget = this.targetPrice.value;
+      const newTarget = currentTarget * 1.5;
+      this.targetPrice.next(newTarget);
+    }
+  }
+
+  private calculateMonthsUntilNextPurchase(): number {
+    const target = this.targetPrice.value;
+    const currentCash = this.cashBalance.value;
+    
+    // If we already have enough cash, return 0
+    if (currentCash >= target) {
+      return 0;
+    }
+    
+    // Calculate how much more we need
+    const deficit = target - currentCash;
+    const monthlyCashFlow = this.getTotalMonthlyCashFlow();
+    
+    // Avoid division by zero
+    if (monthlyCashFlow <= 0) {
+      return -1; // Indicate we can't reach target with no cash flow
+    }
+    
+    // Calculate months needed to accumulate the deficit
+    return Math.ceil(deficit / monthlyCashFlow);
+  }
+
+  private getTotalMonthlyCashFlow(): number {
+    const monthlyIncome = this.monthlyIncome.value;
+    const investments = this.investments.value;
+    let monthlyInvestmentReturns = 0;
+    
+    investments.forEach(inv => {
+      if (inv.status === 'active' && inv.monthsRemaining > 0) {
+        monthlyInvestmentReturns += inv.monthlyPayment;
+      }
+    });
+    
+    return monthlyIncome + monthlyInvestmentReturns;
+  }
+
   processMonthlyAccrual(): void {
     const currentInvestments = this.investments.value;
     const now = new Date();
@@ -141,16 +215,36 @@ export class InvestmentTrackerService {
         monthlyInterest = inv.currentBalance * monthlyRate;
         monthlyPrincipal = inv.monthlyPayment - monthlyInterest;
         newBalance = Math.max(0, inv.currentBalance - monthlyPrincipal);
-      } else {
-        // HYSA
+
+        const totalMonthlyReturn = monthlyInterest + monthlyPrincipal;
+        totalMonthlyReturns += totalMonthlyReturn; // Add both to total returns
+      } else if (inv.type === 'hysa') {
+        // HYSA: Works like a savings account with monthly withdrawals
+        // Interest = current balance * monthly compounded rate
+        // Principal = monthly payment - interest (the portion of withdrawal that comes from principal)
+        // Balance decreases as both principal and interest are withdrawn
         const monthlyRate = Math.pow(1 + inv.interestRate, 1/12) - 1;
         monthlyInterest = inv.currentBalance * monthlyRate;
         monthlyPrincipal = inv.monthlyPayment - monthlyInterest;
         newBalance = Math.max(0, inv.currentBalance - monthlyPrincipal);
-      }
 
-      const totalMonthlyReturn = monthlyInterest + monthlyPrincipal;
-      totalMonthlyReturns += totalMonthlyReturn; // Add both to total returns
+        // Total return = full monthly withdrawal amount (principal + interest earned this month)
+        const totalMonthlyReturn = monthlyInterest + monthlyPrincipal;
+        totalMonthlyReturns += totalMonthlyReturn; // Add full withdrawal to available cash
+      } else if (inv.type === 'annuity') {
+        // Annuity: Monthly payment includes both principal return and interest
+        // Interest = current balance * (annual rate / 12)
+        // Principal = monthly payment - interest
+        // Balance decreases as principal is returned
+        const monthlyRate = inv.interestRate / 12;
+        monthlyInterest = inv.currentBalance * monthlyRate;
+        monthlyPrincipal = inv.monthlyPayment - monthlyInterest;
+        newBalance = Math.max(0, inv.currentBalance - monthlyPrincipal);
+
+        // Total return = full monthly payment (principal + interest)
+        const totalMonthlyReturn = monthlyInterest + monthlyPrincipal;
+        totalMonthlyReturns += totalMonthlyReturn; // Add full payment to available cash
+      }
       
       const monthsRemaining = Math.max(0, inv.monthsRemaining - 1);
 
@@ -277,6 +371,8 @@ export class InvestmentTrackerService {
     this.cashBalance.next(0);
     this.totalCashflowAdded.next(0);
     this.totalInvestmentReturns.next(0);
+    this.targetPrice.next(5000);
+    this.currentMonth.next(0);
     this.saveToLocalStorage();
   }
 
@@ -292,7 +388,9 @@ export class InvestmentTrackerService {
         cashBalance: this.cashBalance.value,
         monthlyIncome: this.monthlyIncome.value,
         totalCashflowAdded: this.totalCashflowAdded.value,
-        totalInvestmentReturns: this.totalInvestmentReturns.value
+        totalInvestmentReturns: this.totalInvestmentReturns.value,
+        targetPrice: this.targetPrice.value,
+        currentMonth: this.currentMonth.value
       };
       localStorage.setItem('investmentTrackerData', JSON.stringify(data));
     } catch (e) {
@@ -329,6 +427,8 @@ export class InvestmentTrackerService {
         this.monthlyIncome.next(parsed.monthlyIncome || 0);
         this.totalCashflowAdded.next(parsed.totalCashflowAdded || 0);
         this.totalInvestmentReturns.next(parsed.totalInvestmentReturns || 0);
+        this.targetPrice.next(parsed.targetPrice || 5000);
+        this.currentMonth.next(parsed.currentMonth || 0);
       }
     } catch (e) {
       console.error('Failed to load from local storage', e);

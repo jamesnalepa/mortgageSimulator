@@ -76,7 +76,8 @@ h1 {
 /* Cash Display Panel */
 .cash-display-panel {
   margin-bottom: 25px;
-  display: flex;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
   gap: 20px;
 }
 
@@ -110,6 +111,56 @@ h1 {
   margin: 10px 0 0 0;
   font-size: 14px;
   color: rgba(255, 255, 255, 0.8);
+}
+
+.cashflow-amount {
+  margin: 0;
+  font-size: 36px;
+  font-weight: 700;
+  color: #a8ff60;
+}
+
+.cashflow-breakdown {
+  margin: 10px 0 0 0;
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.7);
+  line-height: 1.5;
+}
+
+.target-amount {
+  margin: 0;
+  font-size: 32px;
+  font-weight: 700;
+  color: #ffd700;
+}
+
+.target-needed {
+  margin: 10px 0 0 0;
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.8);
+}
+
+.target-needed.ready {
+  color: #a8ff60;
+  font-weight: 600;
+}
+
+.months-until {
+  margin: 0;
+  font-size: 32px;
+  font-weight: 700;
+  color: #ff9999;
+}
+
+.months-until.ready {
+  color: #a8ff60;
+}
+
+.months-info {
+  margin: 10px 0 0 0;
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.7);
+  font-style: italic;
 }
 
 h2 {
@@ -314,13 +365,7 @@ textarea.form-control {
   color: #ffd700;
 }
 
-.summary-card.cash-card {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-}
 
-.summary-value.cash {
-  color: #b0e7ff;
-}
 
 /* Breakdown Section */
 .breakdown-section {

@@ -40,6 +40,25 @@
       <p class="cash-amount">{{ formatCurrency(cashBalance) }}</p>
       <p class="cash-monthly">+{{ formatCurrency(monthlyIncome) }}/month</p>
     </div>
+    <div class="cash-card">
+      <h3>Monthly Cash Flow</h3>
+      <p class="cashflow-amount">{{ formatCurrency(getTotalMonthlyCashFlow()) }}</p>
+      <p class="cashflow-breakdown">{{ formatCurrency(monthlyIncome) }} + {{ formatCurrency(getMonthlyInvestmentReturns()) }}</p>
+    </div>
+    <div class="cash-card">
+      <h3>Next Purchase Target</h3>
+      <p class="target-amount">{{ formatCurrency(getNextInvestmentTarget()) }}</p>
+      <p class="target-needed" [class.ready]="cashBalance >= getNextInvestmentTarget()">
+        {{ cashBalance >= getNextInvestmentTarget() ? '✓ Ready to invest!' : 'Need ' + formatCurrency(getNextInvestmentTarget() - cashBalance) }}
+      </p>
+    </div>
+    <div class="cash-card">
+      <h3>Months Until Purchase</h3>
+      <p class="months-until" [class.ready]="getMonthsUntilNextPurchase() === 0">
+        {{ getMonthsUntilNextPurchase() === 0 ? 'Now' : getMonthsUntilNextPurchase() + ' months' }}
+      </p>
+      <p class="months-info">at current cash flow</p>
+    </div>
   </div>
 
     <!-- Add Cash Form -->
@@ -196,9 +215,9 @@
         <h3>Net Worth</h3>
         <p class="summary-value">{{ formatCurrency(currentSnapshot.netWorth) }}</p>
       </div>
-      <div class="summary-card cash-card">
+      <div class="summary-card">
         <h3>Available Cash</h3>
-        <p class="summary-value cash">{{ formatCurrency(currentSnapshot.cashBalance) }}</p>
+        <p class="summary-value">{{ formatCurrency(currentSnapshot.cashBalance) }}</p>
       </div>
       <div class="summary-card">
         <h3>Total Cashflow Added</h3>

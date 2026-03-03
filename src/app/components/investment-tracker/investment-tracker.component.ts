@@ -32,6 +32,7 @@ export class InvestmentTrackerComponent implements OnInit, OnDestroy {
   trackerStartDate: Date = new Date();
   cashBalance: number = 0;
   monthlyIncome: number = 0;
+  targetPrice: number = 5000;
   investmentError: string = '';
   addCashAmount: number = 0;
   private subscriptions = new Subscription();
@@ -88,6 +89,18 @@ export class InvestmentTrackerComponent implements OnInit, OnDestroy {
       })
     );
 
+    this.subscriptions.add(
+      this.trackerService.targetPrice$.subscribe(price => {
+        this.targetPrice = price;
+      })
+    );
+
+    this.subscriptions.add(
+      this.trackerService.currentMonth$.subscribe(month => {
+        this.currentMonth = month;
+      })
+    );
+
     // Update monthly on form type change to calculate monthly payment
     this.investmentForm.get('type')?.valueChanges.subscribe(() => {
       this.calculateMonthlyPayment();
@@ -123,8 +136,25 @@ export class InvestmentTrackerComponent implements OnInit, OnDestroy {
           (monthlyRate * Math.pow(1 + monthlyRate, term))) /
         (Math.pow(1 + monthlyRate, term) - 1);
       this.investmentForm.patchValue({ monthlyPayment: Math.round(payment * 100) / 100 });
+    } else if (type === 'hysa' && rate > 0) {
+      // HYSA: Calculate monthly withdrawal amount (principal + interests) to deplete account over term
+      // Using same amortization formula as mortgage note
+      const compoundRate = Math.pow(1 + rate / 100, 1/12) - 1;
+      const payment =
+        (amount *
+          (compoundRate * Math.pow(1 + compoundRate, term))) /
+        (Math.pow(1 + compoundRate, term) - 1);
+      this.investmentForm.patchValue({ monthlyPayment: Math.round(payment * 100) / 100 });
+    } else if (type === 'annuity' && rate > 0) {
+      // Annuity: Calculate monthly withdrawal amount (principal + interest) to deplete over term
+      // Using same amortization formula
+      const payment =
+        (amount *
+          (monthlyRate * Math.pow(1 + monthlyRate, term))) /
+        (Math.pow(1 + monthlyRate, term) - 1);
+      this.investmentForm.patchValue({ monthlyPayment: Math.round(payment * 100) / 100 });
     } else {
-      // Simple interest
+      // Fallback: Simple interest (for edge cases)
       const payment = (amount * monthlyRate);
       this.investmentForm.patchValue({ monthlyPayment: Math.round(payment * 100) / 100 });
     }
@@ -181,13 +211,12 @@ export class InvestmentTrackerComponent implements OnInit, OnDestroy {
   }
 
   processMonth(): void {
-    this.currentMonth++;
+    this.trackerService.setCurrentMonth(this.currentMonth + 1);
     this.trackerService.processMonthlyAccrual();
   }
 
   resetAll(): void {
     if (confirm('Are you sure you want to reset all data? This cannot be undone.')) {
-      this.currentMonth = 0;
       this.trackerStartDate = new Date();
       this.trackerService.resetAll();
     }
@@ -239,7 +268,56 @@ export class InvestmentTrackerComponent implements OnInit, OnDestroy {
     }
   }
 
+  getMonthlyInvestmentReturns(): number {
+    // Calculate total monthly returns from all active investments
+    let totalReturns = 0;
+    
+    this.investments.forEach(inv => {
+      if (inv.status === 'active' && inv.monthsRemaining > 0) {
+        totalReturns += inv.monthlyPayment;
+      }
+    });
+    
+    return totalReturns;
+  }
+
+  getTotalMonthlyCashFlow(): number {
+    return this.monthlyIncome + this.getMonthlyInvestmentReturns();
+  }
+
+  getNextInvestmentTarget(): number {
+    return this.targetPrice;
+  }
+
+  getMonthsUntilNextPurchase(): number {
+    // Calculate how much more we need
+    const deficit = this.targetPrice - this.cashBalance;
+    
+    // If we already have enough cash, return 0
+    if (deficit <= 0) {
+      return 0;
+    }
+    
+    const monthlyCashFlow = this.getTotalMonthlyCashFlow();
+    
+    // Avoid division by zero
+    if (monthlyCashFlow <= 0) {
+      return -1; // Indicate we can't reach target with no cash flow
+    }
+    
+    // Calculate months needed to accumulate the deficit
+    return Math.ceil(deficit / monthlyCashFlow);
+  }
+
   exportToCSV(): void {
+    // Metadata lines (prefixed with #)
+    const metadataLines = [
+      `#CURRENT_MONTH=${this.currentMonth}`,
+      `#CASH_BALANCE=${this.cashBalance.toFixed(2)}`,
+      `#MONTHLY_INCOME=${this.monthlyIncome.toFixed(2)}`,
+      `#TARGET_PRICE=${this.targetPrice.toFixed(2)}`
+    ];
+
     const headers = [
       'Type',
       'Investment Amount',
@@ -269,6 +347,7 @@ export class InvestmentTrackerComponent implements OnInit, OnDestroy {
     ]);
 
     const csvContent = [
+      metadataLines.join('\n'),
       headers.join(','),
       ...rows.map(row =>
         row
@@ -314,8 +393,31 @@ export class InvestmentTrackerComponent implements OnInit, OnDestroy {
           return;
         }
 
-        // Skip header row
-        const dataLines = lines.slice(1);
+        // Extract metadata lines (lines starting with #)
+        let currentMonth = 0;
+        let cashBalance = 0;
+        let monthlyIncome = 0;
+        let targetPrice = 5000;
+        let headerIndex = 0;
+
+        for (let i = 0; i < lines.length; i++) {
+          if (lines[i].startsWith('#CURRENT_MONTH=')) {
+            currentMonth = parseInt(lines[i].split('=')[1]);
+          } else if (lines[i].startsWith('#CASH_BALANCE=')) {
+            cashBalance = parseFloat(lines[i].split('=')[1]);
+          } else if (lines[i].startsWith('#MONTHLY_INCOME=')) {
+            monthlyIncome = parseFloat(lines[i].split('=')[1]);
+          } else if (lines[i].startsWith('#TARGET_PRICE=')) {
+            targetPrice = parseFloat(lines[i].split('=')[1]);
+          } else if (!lines[i].startsWith('#')) {
+            // This is the header row
+            headerIndex = i;
+            break;
+          }
+        }
+
+        // Skip metadata and header rows
+        const dataLines = lines.slice(headerIndex + 1);
         let importedCount = 0;
 
         const importedInvestments: Omit<TrackedInvestment, 'id'>[] = [];
@@ -374,12 +476,27 @@ export class InvestmentTrackerComponent implements OnInit, OnDestroy {
             console.error('Error parsing CSV line:', error);
           }
         });
+        
+        // Restore tracker state from metadata
+        if (monthlyIncome > 0) {
+          this.trackerService.setMonthlyIncome(monthlyIncome);
+        }
+        if (cashBalance > 0) {
+          this.trackerService.addCash(cashBalance);
+        }
+        if (targetPrice > 0) {
+          this.trackerService.setTargetPrice(targetPrice);
+        }
+        if (currentMonth > 0) {
+          this.trackerService.setCurrentMonth(currentMonth);
+        }
+        
         if (importedInvestments.length > 0) {
           this.trackerService.importInvestments(importedInvestments);
         }
 
         if (importedCount > 0) {
-          alert(`Successfully imported ${importedCount} investment(s)`);
+          alert(`Successfully imported ${importedCount} investment(s) and restored tracker state`);
           input.value = '';
         } else {
           alert('No valid investments found in CSV');
@@ -399,4 +516,5 @@ export class InvestmentTrackerComponent implements OnInit, OnDestroy {
       this.addCashAmount = 0;
     }
   }
+
 }
