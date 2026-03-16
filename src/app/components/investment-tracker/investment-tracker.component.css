@@ -602,3 +602,295 @@ textarea.form-control {
     padding: 8px;
   }
 }
+
+/* LOC Financed table column */
+.loc-financed-cell {
+  text-align: center;
+}
+
+.loc-financed-badge {
+  display: inline-block;
+  background: linear-gradient(135deg, #dc2626 0%, #ef4444 100%);
+  color: white;
+  padding: 3px 8px;
+  border-radius: 10px;
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.no-loc {
+  color: #ccc;
+  font-size: 14px;
+}
+
+/* Form field hint text */
+.field-hint {
+  font-size: 11px;
+  color: #888;
+  margin-top: 4px;
+  font-style: italic;
+}
+
+/* Line of Credit Panel */
+.loc-panel {
+  background: linear-gradient(135deg, #fff8e1 0%, #fff3cd 100%);
+  border-left: 5px solid #f59e0b;
+  border-radius: 8px;
+  padding: 25px;
+  margin-bottom: 30px;
+  box-shadow: 0 2px 8px rgba(245, 158, 11, 0.15);
+}
+
+.loc-panel h2 {
+  margin-top: 0;
+  color: #92400e;
+  border-bottom-color: #f59e0b;
+  margin-bottom: 20px;
+}
+
+.loc-config-form {
+  margin-bottom: 20px;
+}
+
+.loc-config-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 15px;
+  align-items: flex-end;
+}
+
+.loc-info {
+  margin: 12px 0 0 0;
+  font-size: 13px;
+  color: #78350f;
+  font-style: italic;
+}
+
+/* LOC Status Cards */
+.loc-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 15px;
+  margin-bottom: 25px;
+}
+
+.loc-card {
+  border-radius: 8px;
+  padding: 20px;
+  text-align: center;
+  color: white;
+}
+
+.loc-card h3 {
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  margin: 0 0 10px 0;
+  color: rgba(255, 255, 255, 0.85);
+}
+
+.loc-value {
+  font-size: 26px;
+  font-weight: 700;
+  margin: 0;
+  color: white;
+}
+
+.loc-sub {
+  font-size: 12px;
+  margin: 6px 0 0 0;
+  color: rgba(255, 255, 255, 0.75);
+}
+
+.loc-card.credit {
+  background: linear-gradient(135deg, #4f46e5 0%, #6366f1 100%);
+}
+
+.loc-card.available {
+  background: linear-gradient(135deg, #059669 0%, #10b981 100%);
+}
+
+.loc-card.debt {
+  background: linear-gradient(135deg, #6b7280 0%, #9ca3af 100%);
+}
+
+.loc-card.debt.has-balance {
+  background: linear-gradient(135deg, #dc2626 0%, #ef4444 100%);
+}
+
+.loc-card.interest {
+  background: linear-gradient(135deg, #d97706 0%, #f59e0b 100%);
+}
+
+.loc-card.paid {
+  background: linear-gradient(135deg, #92400e 0%, #b45309 100%);
+}
+
+/* LOC Actions */
+.loc-actions {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 20px;
+}
+
+.loc-action-group {
+  background: white;
+  border-radius: 8px;
+  padding: 20px;
+  border: 1px solid rgba(245, 158, 11, 0.3);
+}
+
+.loc-action-group h4 {
+  margin-top: 0;
+  color: #92400e;
+  font-size: 15px;
+}
+
+.loc-action-info {
+  margin: 8px 0 0 0;
+  font-size: 12px;
+  color: #888;
+  font-style: italic;
+}
+
+/* Debt-styled summary cards */
+.summary-card.debt {
+  background: linear-gradient(135deg, #b91c1c 0%, #dc2626 100%);
+}
+
+.summary-sub {
+  font-size: 12px;
+  margin: 6px 0 0 0;
+  color: rgba(255, 255, 255, 0.75);
+}
+
+/* Warning button */
+.btn-warning {
+  background-color: #f59e0b;
+  color: white;
+}
+
+.btn-warning:hover:not(:disabled) {
+  background-color: #d97706;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(245, 158, 11, 0.3);
+}
+
+.btn-undo {
+  background-color: #6b7280;
+  color: white;
+}
+
+.btn-undo:hover:not(:disabled) {
+  background-color: #4b5563;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(107, 114, 128, 0.3);
+}
+
+/* Event History */
+.event-history-section {
+  background: white;
+  border-radius: 8px;
+  padding: 25px;
+  margin-bottom: 30px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+}
+
+.event-history-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 20px;
+}
+
+.event-history-header h2 {
+  margin: 0;
+  border: none;
+  padding: 0;
+}
+
+.event-count-badge {
+  background: #6366f1;
+  color: white;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 3px 10px;
+  border-radius: 12px;
+}
+
+.event-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.event-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 12px 16px;
+  border-radius: 8px;
+  border-left: 4px solid #e5e7eb;
+  background: #f9fafb;
+  transition: background 0.15s;
+}
+
+.event-item:hover {
+  background: #f3f4f6;
+}
+
+.event-icon {
+  font-size: 18px;
+  min-width: 24px;
+  text-align: center;
+  margin-top: 1px;
+}
+
+.event-body {
+  flex: 1;
+  min-width: 0;
+}
+
+.event-description {
+  margin: 0 0 4px 0;
+  font-size: 14px;
+  color: #1f2937;
+  line-height: 1.5;
+}
+
+.event-meta {
+  font-size: 11px;
+  color: #9ca3af;
+}
+
+.event-amount {
+  font-size: 14px;
+  font-weight: 700;
+  color: #374151;
+  white-space: nowrap;
+  align-self: center;
+}
+
+/* Event type border colours */
+.event-investment   { border-left-color: #6366f1; }
+.event-complete     { border-left-color: #10b981; background: #f0fdf4; }
+.event-delete       { border-left-color: #ef4444; background: #fef2f2; }
+.event-month        { border-left-color: #3b82f6; }
+.event-cash         { border-left-color: #22c55e; }
+.event-income       { border-left-color: #14b8a6; }
+.event-loc          { border-left-color: #f59e0b; }
+.event-loc-draw     { border-left-color: #dc2626; background: #fff7ed; }
+.event-loc-repay    { border-left-color: #059669; background: #f0fdf4; }
+.event-import       { border-left-color: #8b5cf6; }
+.event-reset        { border-left-color: #6b7280; background: #f9fafb; }
+
+.event-show-more {
+  margin-top: 16px;
+  text-align: center;
+}
+
+.event-export {
+  margin-top: 12px;
+  text-align: center;
+}

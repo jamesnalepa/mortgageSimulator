@@ -33,6 +33,107 @@
     </form>
   </div>
 
+    <!-- Add Cash Form -->
+  <div class="form-panel" style="margin-bottom: 20px;">
+    <form class="form-row" (submit)="$event.preventDefault(); addCash();">
+      <div class="form-group">
+        <label for="addCashAmount">Add Cash</label>
+        <input id="addCashAmount" type="number" [(ngModel)]="addCashAmount" name="addCashAmount" min="1" class="form-control" placeholder="Amount" />
+      </div>
+      <div class="form-group" style="align-self: flex-end;">
+        <button type="submit" class="btn btn-primary">Add</button>
+      </div>
+    </form>
+  </div>
+
+  <!-- Line of Credit Panel -->
+  <div class="loc-panel">
+    <h2>Line of Credit</h2>
+
+    <!-- LOC Configuration -->
+    <form [formGroup]="locForm" class="loc-config-form">
+      <div class="loc-config-grid">
+        <div class="form-group">
+          <label for="locLimit">Credit Limit ($):</label>
+          <input type="number" id="locLimit" formControlName="locLimit" class="form-control" min="0" step="1000" placeholder="50000" />
+        </div>
+        <div class="form-group">
+          <label for="locInterestRate">Annual Interest Rate (%):</label>
+          <input type="number" id="locInterestRate" formControlName="locInterestRate" class="form-control" step="0.1" min="0" max="50" placeholder="8" />
+        </div>
+        <div class="form-group" style="align-self: flex-end;">
+          <button type="button" class="btn btn-primary" (click)="configureLoc()" [disabled]="locForm.invalid">
+            Configure LOC
+          </button>
+        </div>
+      </div>
+      <p class="loc-info">
+        Interest on the outstanding balance is automatically deducted from your cash each month when you process a month advance.
+      </p>
+    </form>
+
+    <!-- LOC Status Cards -->
+    <div class="loc-cards" *ngIf="locLimit > 0">
+      <div class="loc-card credit">
+        <h3>Credit Limit</h3>
+        <p class="loc-value">{{ formatCurrency(locLimit) }}</p>
+      </div>
+      <div class="loc-card available">
+        <h3>Available Credit</h3>
+        <p class="loc-value">{{ formatCurrency(getAvailableCredit()) }}</p>
+        <p class="loc-sub">{{ getLocUtilization() | number:'1.0-0' }}% utilized</p>
+      </div>
+      <div class="loc-card debt" [class.has-balance]="locBalance > 0">
+        <h3>Outstanding Balance</h3>
+        <p class="loc-value">{{ formatCurrency(locBalance) }}</p>
+      </div>
+      <div class="loc-card interest">
+        <h3>Monthly Interest Cost</h3>
+        <p class="loc-value">{{ formatCurrency(getMonthlyLocInterest()) }}</p>
+        <p class="loc-sub">{{ (locInterestRate * 100) | number:'1.1-2' }}% APR</p>
+      </div>
+      <div class="loc-card paid">
+        <h3>Total Interest Paid</h3>
+        <p class="loc-value">{{ formatCurrency(totalLocInterestPaid) }}</p>
+      </div>
+    </div>
+
+    <!-- Draw / Repay Actions -->
+    <div class="loc-actions" *ngIf="locLimit > 0">
+      <div class="loc-action-group">
+        <h4>Draw from Line of Credit</h4>
+        <div class="form-row">
+          <div class="form-group">
+            <label for="locDrawAmount">Amount ($):</label>
+            <input type="number" id="locDrawAmount" [(ngModel)]="locDrawAmount" name="locDrawAmount" class="form-control" min="1" [max]="getAvailableCredit()" placeholder="Amount to draw" />
+          </div>
+          <div class="form-group" style="align-self: flex-end;">
+            <button type="button" class="btn btn-warning" (click)="drawFromLoc()" [disabled]="locDrawAmount <= 0 || locDrawAmount > getAvailableCredit()">
+              Draw Funds
+            </button>
+          </div>
+        </div>
+        <p class="loc-action-info">Drawn funds are added to your available cash for investment.</p>
+      </div>
+
+      <div class="loc-action-group">
+        <h4>Repay Line of Credit</h4>
+        <div class="form-row">
+          <div class="form-group">
+            <label for="locRepayAmount">Amount ($):</label>
+            <input type="number" id="locRepayAmount" [(ngModel)]="locRepayAmount" name="locRepayAmount" class="form-control" min="1" [max]="locBalance" placeholder="Amount to repay" />
+          </div>
+          <div class="form-group" style="align-self: flex-end;">
+            <button type="button" class="btn btn-success" (click)="repayLoc()" [disabled]="locRepayAmount <= 0 || locBalance === 0">
+              Repay Balance
+            </button>
+          </div>
+        </div>
+        <p class="loc-action-info">Repayment deducts from your available cash and reduces the LOC balance.</p>
+      </div>
+    </div>
+  </div>
+
   <!-- Available Cash Display -->
   <div class="cash-display-panel">
     <div class="cash-card">
@@ -59,19 +160,6 @@
       </p>
       <p class="months-info">at current cash flow</p>
     </div>
-  </div>
-
-    <!-- Add Cash Form -->
-  <div class="form-panel" style="margin-bottom: 20px;">
-    <form class="form-row" (submit)="$event.preventDefault(); addCash();">
-      <div class="form-group">
-        <label for="addCashAmount">Add Cash</label>
-        <input id="addCashAmount" type="number" [(ngModel)]="addCashAmount" name="addCashAmount" min="1" class="form-control" placeholder="Amount" />
-      </div>
-      <div class="form-group" style="align-self: flex-end;">
-        <button type="submit" class="btn btn-primary">Add</button>
-      </div>
-    </form>
   </div>
 
   <!-- Add Investment Form -->
@@ -146,6 +234,20 @@
           />
         </div>
 
+        <div class="form-group" *ngIf="locLimit > 0">
+          <label for="locFinancedAmount">Finance with LOC ($):</label>
+          <input
+            type="number"
+            id="locFinancedAmount"
+            formControlName="locFinancedAmount"
+            class="form-control"
+            min="0"
+            step="100"
+            placeholder="0"
+          />
+          <span class="field-hint">Available credit: {{ formatCurrency(getAvailableCredit()) }}</span>
+        </div>
+
         <div class="form-group">
           <label for="notes">Notes:</label>
           <textarea
@@ -164,6 +266,9 @@
         </button>
         <button type="button" class="btn btn-secondary" (click)="processMonth()">
           Process Month
+        </button>
+        <button type="button" class="btn btn-undo" (click)="undoMonth()" [disabled]="!canUndo" title="Revert last processed month">
+          ↩ Undo Month
         </button>
         <button
           type="button"
@@ -214,6 +319,7 @@
       <div class="summary-card highlight">
         <h3>Net Worth</h3>
         <p class="summary-value">{{ formatCurrency(currentSnapshot.netWorth) }}</p>
+        <p class="summary-sub" *ngIf="currentSnapshot.locBalance > 0">LOC debt: -{{ formatCurrency(currentSnapshot.locBalance) }}</p>
       </div>
       <div class="summary-card">
         <h3>Available Cash</h3>
@@ -226,6 +332,15 @@
       <div class="summary-card">
         <h3>Investment Returns Added</h3>
         <p class="summary-value returns">{{ formatCurrency(currentSnapshot.totalInvestmentReturns) }}</p>
+      </div>
+      <div class="summary-card debt" *ngIf="currentSnapshot.locLimit > 0">
+        <h3>LOC Balance</h3>
+        <p class="summary-value">{{ formatCurrency(currentSnapshot.locBalance) }}</p>
+        <p class="summary-sub">of {{ formatCurrency(currentSnapshot.locLimit) }} limit</p>
+      </div>
+      <div class="summary-card debt" *ngIf="currentSnapshot.locLimit > 0">
+        <h3>Total LOC Interest Paid</h3>
+        <p class="summary-value">{{ formatCurrency(currentSnapshot.totalLocInterestPaid) }}</p>
       </div>
       <div class="summary-card">
         <h3>Active Investments</h3>
@@ -280,6 +395,7 @@
             <th>Interest Rate</th>
             <th>Total Interest</th>
             <th>Months Remaining</th>
+            <th>LOC Financed</th>
             <th>Status</th>
             <th>Started</th>
             <th>Notes</th>
@@ -300,6 +416,12 @@
             <td>{{ formatPercent(investment.interestRate) }}</td>
             <td class="interest">{{ formatCurrency(investment.totalInterestEarned) }}</td>
             <td>{{ investment.monthsRemaining }}</td>
+            <td class="loc-financed-cell">
+              <span *ngIf="investment.locFinancedAmount > 0" class="loc-financed-badge">
+                {{ formatCurrency(investment.locFinancedAmount) }}
+              </span>
+              <span *ngIf="!investment.locFinancedAmount || investment.locFinancedAmount === 0" class="no-loc">—</span>
+            </td>
             <td>
               <span
                 class="status-badge"
@@ -325,6 +447,42 @@
     </div>
     <div class="empty-state" *ngIf="investments.length === 0">
       <p>No investments yet. Add one to get started!</p>
+    </div>
+  </div>
+
+  <!-- Event History -->
+  <div class="event-history-section" *ngIf="eventLog.length > 0">
+    <div class="event-history-header">
+      <h2>Activity History</h2>
+      <span class="event-count-badge">{{ eventLog.length }} event{{ eventLog.length !== 1 ? 's' : '' }}</span>
+    </div>
+    <div class="event-list">
+      <div
+        class="event-item"
+        *ngFor="let event of getVisibleEvents()"
+        [ngClass]="getEventClass(event.type)"
+      >
+        <span class="event-icon">{{ getEventIcon(event.type) }}</span>
+        <div class="event-body">
+          <p class="event-description">{{ event.description }}</p>
+          <span class="event-meta">
+            Month {{ event.month }} &bull; {{ event.date | date: 'MMM d, y, h:mm a' }}
+          </span>
+        </div>
+        <div class="event-amount" *ngIf="event.amount != null">
+          {{ formatCurrency(event.amount) }}
+        </div>
+      </div>
+    </div>
+    <div class="event-show-more" *ngIf="eventLog.length > 20">
+      <button class="btn btn-secondary" (click)="showAllEvents = !showAllEvents">
+        {{ showAllEvents ? 'Show Recent Only' : 'Show All ' + eventLog.length + ' Events' }}
+      </button>
+    </div>
+    <div class="event-export">
+      <button class="btn btn-success" (click)="exportHistoryToCSV()">
+        Export Activity History to CSV
+      </button>
     </div>
   </div>
 

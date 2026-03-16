@@ -143,6 +143,7 @@ export interface TrackedInvestment {
   totalInterestEarned: number; // cumulative interest earned
   status: 'active' | 'completed'; // whether it's still generating revenue
   notes?: string; // any notes about the investment
+  locFinancedAmount: number; // current LOC balance attributed to this investment (decreases as LOC is repaid)
 }
 
 export interface TrackedInvestorSnapshot {
@@ -153,9 +154,13 @@ export interface TrackedInvestorSnapshot {
   cashBalance: number; // current available cash
   totalCashflowAdded: number; // cumulative monthly income (paycheck) added
   totalInvestmentReturns: number; // cumulative investment returns added to cash
-  netWorth: number; // (totalBalance + cashBalance) - initial capital spent
+  netWorth: number; // (totalBalance + cashBalance - locBalance)
   activeInvestments: number; // count of active investments
   completedInvestments: number; // count of completed investments
+  locBalance: number; // outstanding line of credit balance (debt)
+  locLimit: number; // configured line of credit limit
+  locInterestRate: number; // annual interest rate on LOC (0-1)
+  totalLocInterestPaid: number; // cumulative LOC interest paid
   investmentsByType: {
     mortgageNotes: {
       count: number;
@@ -186,4 +191,31 @@ export interface NetWorthHistory {
   cashBalance: number;
   totalCashflowAdded: number;
   totalInvestmentReturns: number;
+  locBalance: number; // outstanding LOC balance at this point
+  totalLocInterestPaid: number; // cumulative LOC interest paid
+}
+
+// ===== Event History =====
+
+export type TrackerEventType =
+  | 'investment-added'
+  | 'investment-deleted'
+  | 'investment-completed'
+  | 'month-processed'
+  | 'cash-added'
+  | 'income-set'
+  | 'loc-configured'
+  | 'loc-draw'
+  | 'loc-repay'
+  | 'data-imported'
+  | 'reset';
+
+export interface TrackerEvent {
+  id: string;
+  type: TrackerEventType;
+  date: Date;
+  month: number;          // tracker month number when this happened
+  description: string;   // human-readable summary
+  amount?: number;        // primary dollar amount (if applicable)
+  meta?: Record<string, string | number | boolean>; // extra key/value details
 }

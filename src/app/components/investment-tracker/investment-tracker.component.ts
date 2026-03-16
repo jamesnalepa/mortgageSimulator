@@ -12,7 +12,8 @@ import { InvestmentTrackerService } from '../../services/investment-tracker.serv
 import {
   TrackedInvestment,
   TrackedInvestorSnapshot,
-  NetWorthHistory
+  NetWorthHistory,
+  TrackerEvent
 } from '../../models/mortgage-note.interface';
 
 @Component({
@@ -23,8 +24,10 @@ import {
   styleUrl: './investment-tracker.component.css'
 })
 export class InvestmentTrackerComponent implements OnInit, OnDestroy {
+  readonly Math = Math;
   investmentForm: FormGroup;
   cashflowForm: FormGroup;
+  locForm: FormGroup;
   investments: TrackedInvestment[] = [];
   currentSnapshot: TrackedInvestorSnapshot | null = null;
   netWorthHistory: NetWorthHistory[] = [];
@@ -35,6 +38,15 @@ export class InvestmentTrackerComponent implements OnInit, OnDestroy {
   targetPrice: number = 5000;
   investmentError: string = '';
   addCashAmount: number = 0;
+  locBalance: number = 0;
+  locLimit: number = 0;
+  locInterestRate: number = 0;
+  totalLocInterestPaid: number = 0;
+  locDrawAmount: number = 0;
+  locRepayAmount: number = 0;
+  eventLog: TrackerEvent[] = [];
+  showAllEvents: boolean = false;
+  canUndo: boolean = false;
   private subscriptions = new Subscription();
 
   constructor(
@@ -47,11 +59,17 @@ export class InvestmentTrackerComponent implements OnInit, OnDestroy {
       interestRate: [12, [Validators.required, Validators.min(0.1), Validators.max(50)]],
       monthlyPayment: [0, [Validators.required, Validators.min(0)]],
       termLengthMonths: [60, [Validators.required, Validators.min(1), Validators.max(360)]],
+      locFinancedAmount: [0, [Validators.min(0)]],
       notes: ['']
     });
 
     this.cashflowForm = this.fb.group({
       monthlyIncome: [5000, [Validators.required, Validators.min(0)]]
+    });
+
+    this.locForm = this.fb.group({
+      locLimit: [0, [Validators.required, Validators.min(0)]],
+      locInterestRate: [8, [Validators.required, Validators.min(0), Validators.max(50)]]
     });
 
     this.addCashAmount = 0;
@@ -92,6 +110,44 @@ export class InvestmentTrackerComponent implements OnInit, OnDestroy {
     this.subscriptions.add(
       this.trackerService.targetPrice$.subscribe(price => {
         this.targetPrice = price;
+      })
+    );
+
+    this.subscriptions.add(
+      this.trackerService.locBalance$.subscribe(balance => {
+        this.locBalance = balance;
+      })
+    );
+
+    this.subscriptions.add(
+      this.trackerService.locLimit$.subscribe(limit => {
+        this.locLimit = limit;
+        this.locForm.patchValue({ locLimit: limit });
+      })
+    );
+
+    this.subscriptions.add(
+      this.trackerService.locInterestRate$.subscribe(rate => {
+        this.locInterestRate = rate;
+        this.locForm.patchValue({ locInterestRate: rate * 100 });
+      })
+    );
+
+    this.subscriptions.add(
+      this.trackerService.totalLocInterestPaid$.subscribe(paid => {
+        this.totalLocInterestPaid = paid;
+      })
+    );
+
+    this.subscriptions.add(
+      this.trackerService.eventLog$.subscribe(log => {
+        this.eventLog = log;
+      })
+    );
+
+    this.subscriptions.add(
+      this.trackerService.canUndo$.subscribe(stack => {
+        this.canUndo = stack.length > 0;
       })
     );
 
@@ -163,16 +219,24 @@ export class InvestmentTrackerComponent implements OnInit, OnDestroy {
   addInvestment(): void {
     if (this.investmentForm.valid) {
       const formValue = this.investmentForm.value;
-      
-      // Check if there's sufficient cash
-      if (formValue.investmentAmount > this.cashBalance) {
-        this.investmentError = `Insufficient cash. You need $${formValue.investmentAmount.toLocaleString()} but only have $${this.cashBalance.toLocaleString()} available.`;
-        // Clear error after 5 seconds
+      const locFinanced = formValue.locFinancedAmount ?? 0;
+      const cashRequired = formValue.investmentAmount - locFinanced;
+
+      // Validate LOC portion
+      if (locFinanced > 0 && locFinanced > this.getAvailableCredit()) {
+        this.investmentError = `LOC draw of ${this.formatCurrency(locFinanced)} exceeds available credit of ${this.formatCurrency(this.getAvailableCredit())}.`;
         setTimeout(() => this.investmentError = '', 5000);
         return;
       }
-      
-      this.investmentError = ''; // Clear any previous errors
+
+      // Check cash covers the non-LOC portion
+      if (cashRequired > this.cashBalance) {
+        this.investmentError = `Insufficient cash. Need ${this.formatCurrency(cashRequired)} (after LOC financing) but only have ${this.formatCurrency(this.cashBalance)} available.`;
+        setTimeout(() => this.investmentError = '', 5000);
+        return;
+      }
+
+      this.investmentError = '';
       this.trackerService.addInvestment({
         type: formValue.type,
         investmentAmount: formValue.investmentAmount,
@@ -184,6 +248,7 @@ export class InvestmentTrackerComponent implements OnInit, OnDestroy {
         currentBalance: formValue.investmentAmount,
         totalInterestEarned: 0,
         status: 'active',
+        locFinancedAmount: locFinanced,
         notes: formValue.notes
       });
       this.investmentForm.reset({
@@ -192,6 +257,7 @@ export class InvestmentTrackerComponent implements OnInit, OnDestroy {
         interestRate: 12,
         monthlyPayment: 0,
         termLengthMonths: 60,
+        locFinancedAmount: 0,
         notes: ''
       });
     }
@@ -213,6 +279,13 @@ export class InvestmentTrackerComponent implements OnInit, OnDestroy {
   processMonth(): void {
     this.trackerService.setCurrentMonth(this.currentMonth + 1);
     this.trackerService.processMonthlyAccrual();
+  }
+
+  undoMonth(): void {
+    if (!this.canUndo) return;
+    if (confirm(`Undo Month ${this.currentMonth} and restore state to Month ${this.currentMonth - 1}?`)) {
+      this.trackerService.undoLastMonth();
+    }
   }
 
   resetAll(): void {
@@ -315,7 +388,11 @@ export class InvestmentTrackerComponent implements OnInit, OnDestroy {
       `#CURRENT_MONTH=${this.currentMonth}`,
       `#CASH_BALANCE=${this.cashBalance.toFixed(2)}`,
       `#MONTHLY_INCOME=${this.monthlyIncome.toFixed(2)}`,
-      `#TARGET_PRICE=${this.targetPrice.toFixed(2)}`
+      `#TARGET_PRICE=${this.targetPrice.toFixed(2)}`,
+      `#LOC_LIMIT=${this.locLimit.toFixed(2)}`,
+      `#LOC_INTEREST_RATE=${this.locInterestRate.toFixed(6)}`,
+      `#LOC_BALANCE=${this.locBalance.toFixed(2)}`,
+      `#LOC_INTEREST_PAID=${this.totalLocInterestPaid.toFixed(2)}`
     ];
 
     const headers = [
@@ -329,6 +406,7 @@ export class InvestmentTrackerComponent implements OnInit, OnDestroy {
       'Months Remaining',
       'Status',
       'Purchase Date',
+      'LOC Financed Amount',
       'Notes'
     ];
 
@@ -343,6 +421,7 @@ export class InvestmentTrackerComponent implements OnInit, OnDestroy {
       inv.monthsRemaining,
       inv.status,
       new Date(inv.purchaseDate).toISOString().split('T')[0],
+      (inv.locFinancedAmount ?? 0).toFixed(2),
       inv.notes || ''
     ]);
 
@@ -398,6 +477,10 @@ export class InvestmentTrackerComponent implements OnInit, OnDestroy {
         let cashBalance = 0;
         let monthlyIncome = 0;
         let targetPrice = 5000;
+        let locLimit = 0;
+        let locInterestRate = 0;
+        let locBalance = 0;
+        let locInterestPaid = 0;
         let headerIndex = 0;
 
         for (let i = 0; i < lines.length; i++) {
@@ -409,6 +492,14 @@ export class InvestmentTrackerComponent implements OnInit, OnDestroy {
             monthlyIncome = parseFloat(lines[i].split('=')[1]);
           } else if (lines[i].startsWith('#TARGET_PRICE=')) {
             targetPrice = parseFloat(lines[i].split('=')[1]);
+          } else if (lines[i].startsWith('#LOC_LIMIT=')) {
+            locLimit = parseFloat(lines[i].split('=')[1]);
+          } else if (lines[i].startsWith('#LOC_INTEREST_RATE=')) {
+            locInterestRate = parseFloat(lines[i].split('=')[1]);
+          } else if (lines[i].startsWith('#LOC_BALANCE=')) {
+            locBalance = parseFloat(lines[i].split('=')[1]);
+          } else if (lines[i].startsWith('#LOC_INTEREST_PAID=')) {
+            locInterestPaid = parseFloat(lines[i].split('=')[1]);
           } else if (!lines[i].startsWith('#')) {
             // This is the header row
             headerIndex = i;
@@ -457,7 +548,11 @@ export class InvestmentTrackerComponent implements OnInit, OnDestroy {
             const monthsRemaining = parseInt(fields[7]);
             const monthlyPayment = parseFloat(fields[3]);
             const purchaseDate = new Date(fields[9]);
-            const notes = fields[10];
+            // Column 10 is LOC Financed Amount (new), column 11 is Notes
+            // Handle CSVs without the LOC column (legacy: col 10 = Notes)
+            const hasLocColumn = fields.length >= 12;
+            const locFinancedAmount = hasLocColumn ? parseFloat(fields[10]) || 0 : 0;
+            const notes = hasLocColumn ? fields[11] : fields[10];
             importedInvestments.push({
               type,
               investmentAmount,
@@ -469,6 +564,7 @@ export class InvestmentTrackerComponent implements OnInit, OnDestroy {
               currentBalance: parseFloat(fields[2]),
               totalInterestEarned: parseFloat(fields[5]),
               status: (fields[8] as 'active' | 'completed') || 'active',
+              locFinancedAmount,
               notes
             });
             importedCount++;
@@ -489,6 +585,9 @@ export class InvestmentTrackerComponent implements OnInit, OnDestroy {
         }
         if (currentMonth > 0) {
           this.trackerService.setCurrentMonth(currentMonth);
+        }
+        if (locLimit > 0 || locInterestRate > 0 || locBalance > 0 || locInterestPaid > 0) {
+          this.trackerService.restoreLocState(locLimit, locInterestRate, locBalance, locInterestPaid);
         }
         
         if (importedInvestments.length > 0) {
@@ -515,6 +614,126 @@ export class InvestmentTrackerComponent implements OnInit, OnDestroy {
       this.trackerService.addCash(this.addCashAmount);
       this.addCashAmount = 0;
     }
+  }
+
+  configureLoc(): void {
+    if (this.locForm.valid) {
+      const limit = this.locForm.get('locLimit')?.value ?? 0;
+      const rate = (this.locForm.get('locInterestRate')?.value ?? 0) / 100;
+      this.trackerService.configureLoc(limit, rate);
+    }
+  }
+
+  drawFromLoc(): void {
+    if (this.locDrawAmount > 0) {
+      this.trackerService.drawFromLoc(this.locDrawAmount);
+      this.locDrawAmount = 0;
+    }
+  }
+
+  repayLoc(): void {
+    if (this.locRepayAmount > 0) {
+      this.trackerService.repayLoc(this.locRepayAmount);
+      this.locRepayAmount = 0;
+    }
+  }
+
+  getAvailableCredit(): number {
+    return Math.max(0, this.locLimit - this.locBalance);
+  }
+
+  getMonthlyLocInterest(): number {
+    return this.locBalance * (this.locInterestRate / 12);
+  }
+
+  getLocUtilization(): number {
+    if (this.locLimit === 0) return 0;
+    return (this.locBalance / this.locLimit) * 100;
+  }
+
+  exportHistoryToCSV(): void {
+    const headers = ['#', 'Event Type', 'Month', 'Date', 'Description', 'Amount'];
+
+    const typeLabels: Record<string, string> = {
+      'investment-added': 'Investment Added',
+      'investment-deleted': 'Investment Deleted',
+      'investment-completed': 'Investment Completed',
+      'month-processed': 'Month Processed',
+      'cash-added': 'Cash Added',
+      'income-set': 'Income Set',
+      'loc-configured': 'LOC Configured',
+      'loc-draw': 'LOC Draw',
+      'loc-repay': 'LOC Repay',
+      'data-imported': 'Data Imported',
+      'reset': 'Reset'
+    };
+
+    const rows = [...this.eventLog].reverse().map((event, i) => [
+      String(i + 1),
+      typeLabels[event.type] || event.type,
+      String(event.month),
+      new Date(event.date).toLocaleString(),
+      event.description,
+      event.amount != null ? event.amount.toFixed(2) : ''
+    ]);
+
+    const escape = (cell: string) =>
+      cell.includes(',') || cell.includes('"') || cell.includes('\n')
+        ? `"${cell.replace(/"/g, '""')}"`
+        : cell;
+
+    const csvContent = [
+      headers.join(','),
+      ...rows.map(row => row.map(escape).join(','))
+    ].join('\n');
+
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    const url = URL.createObjectURL(blob);
+    link.setAttribute('href', url);
+    link.setAttribute('download', `activity-history-${new Date().toISOString().split('T')[0]}.csv`);
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  }
+
+  getVisibleEvents(): TrackerEvent[] {
+    return this.showAllEvents ? this.eventLog : this.eventLog.slice(0, 20);
+  }
+
+  getEventIcon(type: string): string {
+    const icons: Record<string, string> = {
+      'investment-added': '📈',
+      'investment-deleted': '🗑️',
+      'investment-completed': '✅',
+      'month-processed': '📅',
+      'cash-added': '💵',
+      'income-set': '💼',
+      'loc-configured': '🏦',
+      'loc-draw': '📤',
+      'loc-repay': '📥',
+      'data-imported': '📋',
+      'reset': '🔄'
+    };
+    return icons[type] || '📌';
+  }
+
+  getEventClass(type: string): string {
+    const classes: Record<string, string> = {
+      'investment-added': 'event-investment',
+      'investment-deleted': 'event-delete',
+      'investment-completed': 'event-complete',
+      'month-processed': 'event-month',
+      'cash-added': 'event-cash',
+      'income-set': 'event-income',
+      'loc-configured': 'event-loc',
+      'loc-draw': 'event-loc-draw',
+      'loc-repay': 'event-loc-repay',
+      'data-imported': 'event-import',
+      'reset': 'event-reset'
+    };
+    return classes[type] || '';
   }
 
 }

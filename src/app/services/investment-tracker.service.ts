@@ -3,7 +3,9 @@ import { BehaviorSubject, Observable } from 'rxjs';
 import {
   TrackedInvestment,
   TrackedInvestorSnapshot,
-  NetWorthHistory
+  NetWorthHistory,
+  TrackerEvent,
+  TrackerEventType
 } from '../models/mortgage-note.interface';
 
 @Injectable({
@@ -15,6 +17,7 @@ export class InvestmentTrackerService {
         if (amount <= 0) return;
         const newBalance = this.cashBalance.value + amount;
         this.cashBalance.next(newBalance);
+        this.logEvent('cash-added', `Added ${this.fmt(amount)} cash. New balance: ${this.fmt(newBalance)}`, amount);
         this.updateSnapshots();
         this.saveToLocalStorage();
       }
@@ -23,9 +26,13 @@ export class InvestmentTrackerService {
       const currentInvestments = this.investments.value;
       const imported = investments.map(inv => ({
         id: `INV-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-        ...inv
+        ...inv,
+        locFinancedAmount: inv.locFinancedAmount ?? 0
       }));
       this.investments.next([...currentInvestments, ...imported]);
+      this.logEvent('data-imported',
+        `Imported ${imported.length} investment${imported.length !== 1 ? 's' : ''} from CSV`,
+        undefined, { count: imported.length });
       this.updateSnapshots();
       this.saveToLocalStorage();
     }
@@ -38,6 +45,12 @@ export class InvestmentTrackerService {
   private totalInvestmentReturns = new BehaviorSubject<number>(0);
   private targetPrice = new BehaviorSubject<number>(5000);
   private currentMonth = new BehaviorSubject<number>(0);
+  private locBalance = new BehaviorSubject<number>(0);
+  private locLimit = new BehaviorSubject<number>(0);
+  private locInterestRate = new BehaviorSubject<number>(0); // annual rate (0-1)
+  private totalLocInterestPaid = new BehaviorSubject<number>(0);
+  private eventLog = new BehaviorSubject<TrackerEvent[]>([]);
+  private undoStack = new BehaviorSubject<any[]>([]); // max 12 states, most-recent first
 
   public investments$ = this.investments.asObservable();
   public snapshots$ = this.snapshots.asObservable();
@@ -48,35 +61,69 @@ export class InvestmentTrackerService {
   public totalInvestmentReturns$ = this.totalInvestmentReturns.asObservable();
   public targetPrice$ = this.targetPrice.asObservable();
   public currentMonth$ = this.currentMonth.asObservable();
+  public locBalance$ = this.locBalance.asObservable();
+  public locLimit$ = this.locLimit.asObservable();
+  public locInterestRate$ = this.locInterestRate.asObservable();
+  public totalLocInterestPaid$ = this.totalLocInterestPaid.asObservable();
+  public eventLog$ = this.eventLog.asObservable();
+  public canUndo$ = this.undoStack.asObservable();
 
   constructor() {
     this.loadFromLocalStorage();
   }
 
   addInvestment(investment: Omit<TrackedInvestment, 'id'>): void {
-    // Check if there's sufficient cash for this investment
+    const locFinanced = investment.locFinancedAmount ?? 0;
+    const cashRequired = investment.investmentAmount - locFinanced;
+
+    // Validate LOC financing
+    if (locFinanced > 0) {
+      const availableCredit = this.locLimit.value - this.locBalance.value;
+      if (locFinanced > availableCredit) {
+        console.warn(`LOC draw $${locFinanced} exceeds available credit $${availableCredit}`);
+        return;
+      }
+    }
+
+    // Validate cash for the non-LOC portion
     const currentCash = this.cashBalance.value;
-    if (investment.investmentAmount > currentCash) {
-      console.warn(`Insufficient cash balance. Need $${investment.investmentAmount}, have $${currentCash}`);
+    if (cashRequired > currentCash) {
+      console.warn(`Insufficient cash. Need $${cashRequired}, have $${currentCash}`);
       return;
     }
 
     const id = `INV-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-    const newInvestment: TrackedInvestment = {
-      id,
-      ...investment
-    };
+    const newInvestment: TrackedInvestment = { id, ...investment, locFinancedAmount: locFinanced };
 
     const currentInvestments = this.investments.value;
     this.investments.next([...currentInvestments, newInvestment]);
-    
-    // Deduct investment amount from available cash
-    const newCashBalance = currentCash - investment.investmentAmount;
-    this.cashBalance.next(newCashBalance);
-    
+
+    // Draw LOC-financed portion (adds to cash then deducted below)
+    if (locFinanced > 0) {
+      this.locBalance.next(this.locBalance.value + locFinanced);
+    }
+
+    // Deduct full investment amount from cash (which now includes the LOC draw)
+    this.cashBalance.next(currentCash + locFinanced - investment.investmentAmount);
+
+    // Log event
+    const typeLabelMap: Record<string, string> = { 'mortgage-note': 'Mortgage Note', 'hysa': 'HYSA', 'annuity': 'Annuity' };
+    const typeLabel = typeLabelMap[investment.type] || investment.type;
+    let desc = `Added ${typeLabel} — ${this.fmt(investment.investmentAmount)} invested`;
+    if (locFinanced > 0) {
+      const locPct = ((locFinanced / investment.investmentAmount) * 100).toFixed(0);
+      desc += `. LOC financed: ${this.fmt(locFinanced)} (${locPct}% of total, LOC balance now ${this.fmt(this.locBalance.value)})`;
+    }
+    this.logEvent('investment-added', desc, investment.investmentAmount, {
+      type: investment.type,
+      locFinanced,
+      cashPortion: cashRequired,
+      locBalanceAfter: this.locBalance.value
+    });
+
     // Update target price if months to next purchase is <= 2
     this.updateTargetPriceIfNeeded();
-    
+
     this.updateSnapshots();
     this.saveToLocalStorage();
   }
@@ -95,7 +142,14 @@ export class InvestmentTrackerService {
 
   deleteInvestment(id: string): void {
     const currentInvestments = this.investments.value;
+    const target = currentInvestments.find(inv => inv.id === id);
     this.investments.next(currentInvestments.filter(inv => inv.id !== id));
+    if (target) {
+      const typeLabelMap: Record<string, string> = { 'mortgage-note': 'Mortgage Note', 'hysa': 'HYSA', 'annuity': 'Annuity' };
+      this.logEvent('investment-deleted',
+        `Deleted ${typeLabelMap[target.type] || target.type} — original amount ${this.fmt(target.investmentAmount)}`,
+        target.investmentAmount);
+    }
     this.updateSnapshots();
     this.saveToLocalStorage();
   }
@@ -106,6 +160,7 @@ export class InvestmentTrackerService {
       return;
     }
     this.monthlyIncome.next(amount);
+    this.logEvent('income-set', `Monthly income set to ${this.fmt(amount)}/month`, amount);
     this.saveToLocalStorage();
   }
 
@@ -145,6 +200,95 @@ export class InvestmentTrackerService {
 
   getCurrentMonth(): number {
     return this.currentMonth.value;
+  }
+
+  configureLoc(limit: number, annualRate: number): void {
+    if (limit >= 0 && annualRate >= 0) {
+      this.locLimit.next(limit);
+      this.locInterestRate.next(annualRate);
+      this.logEvent('loc-configured',
+        `Line of Credit configured — limit ${this.fmt(limit)} at ${(annualRate * 100).toFixed(2)}% APR`,
+        limit, { annualRatePct: annualRate * 100 });
+      this.saveToLocalStorage();
+    }
+  }
+
+  restoreLocState(limit: number, annualRate: number, balance: number, totalInterestPaid: number): void {
+    this.locLimit.next(limit);
+    this.locInterestRate.next(annualRate);
+    this.locBalance.next(balance);
+    this.totalLocInterestPaid.next(totalInterestPaid);
+    this.updateSnapshots();
+    this.saveToLocalStorage();
+  }
+
+  drawFromLoc(amount: number): void {
+    const available = this.locLimit.value - this.locBalance.value;
+    if (amount <= 0 || amount > available) {
+      console.warn(`Cannot draw $${amount} from LOC. Available credit: $${available}`);
+      return;
+    }
+    this.locBalance.next(this.locBalance.value + amount);
+    this.cashBalance.next(this.cashBalance.value + amount);
+    this.logEvent('loc-draw',
+      `Drew ${this.fmt(amount)} from Line of Credit. Outstanding balance: ${this.fmt(this.locBalance.value)}`,
+      amount, { locBalanceAfter: this.locBalance.value, availableCreditAfter: this.locLimit.value - this.locBalance.value });
+    this.updateSnapshots();
+    this.saveToLocalStorage();
+  }
+
+  repayLoc(amount: number): void {
+    const balance = this.locBalance.value;
+    const cash = this.cashBalance.value;
+    const repayAmount = Math.min(amount, balance, cash);
+    if (repayAmount <= 0) return;
+
+    // Reduce global LOC balance and cash
+    this.locBalance.next(balance - repayAmount);
+    this.cashBalance.next(cash - repayAmount);
+    this.logEvent('loc-repay',
+      `Repaid ${this.fmt(repayAmount)} to Line of Credit. Remaining balance: ${this.fmt(this.locBalance.value)}`,
+      repayAmount, { locBalanceAfter: this.locBalance.value });
+
+    // Proportionally reduce locFinancedAmount across investments
+    const investments = this.investments.value;
+    const totalTracked = investments.reduce((sum, inv) => sum + (inv.locFinancedAmount ?? 0), 0);
+    if (totalTracked > 0) {
+      const updated = investments.map(inv => {
+        const financed = inv.locFinancedAmount ?? 0;
+        if (financed <= 0) return inv;
+        const reduction = repayAmount * (financed / totalTracked);
+        return { ...inv, locFinancedAmount: Math.max(0, financed - reduction) };
+      });
+      this.investments.next(updated);
+    }
+
+    this.updateSnapshots();
+    this.saveToLocalStorage();
+  }
+
+  getLocBalance(): number {
+    return this.locBalance.value;
+  }
+
+  getLocLimit(): number {
+    return this.locLimit.value;
+  }
+
+  getAvailableCredit(): number {
+    return Math.max(0, this.locLimit.value - this.locBalance.value);
+  }
+
+  getLocInterestRate(): number {
+    return this.locInterestRate.value;
+  }
+
+  getMonthlyLocInterest(): number {
+    return this.locBalance.value * (this.locInterestRate.value / 12);
+  }
+
+  getTotalLocInterestPaid(): number {
+    return this.totalLocInterestPaid.value;
   }
 
   private updateTargetPriceIfNeeded(): void {
@@ -193,6 +337,9 @@ export class InvestmentTrackerService {
   }
 
   processMonthlyAccrual(): void {
+    // Snapshot full state before mutating so it can be restored
+    this.pushUndoState();
+
     const currentInvestments = this.investments.value;
     const now = new Date();
     let totalMonthlyReturns = 0; // Track total returns (principal + interest) from investments
@@ -257,6 +404,16 @@ export class InvestmentTrackerService {
       };
     });
 
+    // Log any investments that just completed
+    const typeLabelMap: Record<string, string> = { 'mortgage-note': 'Mortgage Note', 'hysa': 'HYSA', 'annuity': 'Annuity' };
+    updated.forEach((inv, i) => {
+      if (inv.status === 'completed' && currentInvestments[i]?.status === 'active') {
+        this.logEvent('investment-completed',
+          `${typeLabelMap[inv.type] || inv.type} completed — original ${this.fmt(inv.investmentAmount)}, total interest earned ${this.fmt(inv.totalInterestEarned)}`,
+          inv.investmentAmount);
+      }
+    });
+
     this.investments.next(updated);
     
     // Add monthly income from paycheck to cash balance
@@ -266,6 +423,15 @@ export class InvestmentTrackerService {
     const totalCashAddition = monthlyIncomeAmount + totalMonthlyReturns;
     const newCashBalance = this.cashBalance.value + totalCashAddition;
     this.cashBalance.next(newCashBalance);
+
+    // Deduct LOC monthly interest from cash
+    const locBal = this.locBalance.value;
+    if (locBal > 0) {
+      const monthlyLocInterest = locBal * (this.locInterestRate.value / 12);
+      const cashAfterLocInterest = Math.max(0, this.cashBalance.value - monthlyLocInterest);
+      this.cashBalance.next(cashAfterLocInterest);
+      this.totalLocInterestPaid.next(this.totalLocInterestPaid.value + monthlyLocInterest);
+    }
     
     // Update total cashflow added (only from actual paycheck income, not investment returns)
     const newTotalCashflow = this.totalCashflowAdded.value + monthlyIncomeAmount;
@@ -274,7 +440,20 @@ export class InvestmentTrackerService {
     // Track total investment returns accumulated (principal + interest combined)
     const newTotalReturns = this.totalInvestmentReturns.value + totalMonthlyReturns;
     this.totalInvestmentReturns.next(newTotalReturns);
-    
+
+    // Build month-processed event description
+    const monthNum = this.currentMonth.value;
+    const locInterestThisMonth = locBal > 0 ? locBal * (this.locInterestRate.value / 12) : 0;
+    let monthDesc = `Month ${monthNum} processed — income +${this.fmt(monthlyIncomeAmount)}, investment returns +${this.fmt(totalMonthlyReturns)}`;
+    if (locInterestThisMonth > 0) {
+      monthDesc += `, LOC interest -${this.fmt(locInterestThisMonth)} (balance ${this.fmt(this.locBalance.value)})`;
+    }
+    this.logEvent('month-processed', monthDesc, totalMonthlyReturns + monthlyIncomeAmount, {
+      monthlyIncome: monthlyIncomeAmount,
+      investmentReturns: totalMonthlyReturns,
+      locInterestPaid: locInterestThisMonth
+    });
+
     this.updateSnapshots();
     this.saveToLocalStorage();
   }
@@ -310,6 +489,10 @@ export class InvestmentTrackerService {
     const currentCash = this.cashBalance.value;
     const totalCashflow = this.totalCashflowAdded.value;
     const totalReturns = this.totalInvestmentReturns.value;
+    const locBal = this.locBalance.value;
+    const locLim = this.locLimit.value;
+    const locRate = this.locInterestRate.value;
+    const locInterestPaid = this.totalLocInterestPaid.value;
 
     const snapshot: TrackedInvestorSnapshot = {
       date: now,
@@ -319,10 +502,14 @@ export class InvestmentTrackerService {
       cashBalance: currentCash,
       totalCashflowAdded: totalCashflow,
       totalInvestmentReturns: totalReturns,
-        netWorth: totalBalance + currentCash,
+        netWorth: totalBalance + currentCash - locBal,
       activeInvestments: investments.filter(i => i.status === 'active').length,
       completedInvestments: investments.filter(i => i.status === 'completed')
         .length,
+      locBalance: locBal,
+      locLimit: locLim,
+      locInterestRate: locRate,
+      totalLocInterestPaid: locInterestPaid,
       investmentsByType: {
         mortgageNotes: calculateTypeStats(mortgageNotes),
         hysa: calculateTypeStats(hysas),
@@ -342,7 +529,9 @@ export class InvestmentTrackerService {
       totalInvested: snapshot.totalInvested,
       cashBalance: currentCash,
       totalCashflowAdded: totalCashflow,
-      totalInvestmentReturns: totalReturns
+      totalInvestmentReturns: totalReturns,
+      locBalance: locBal,
+      totalLocInterestPaid: locInterestPaid
     };
     this.netWorthHistory.next([...currentHistory, historyEntry]);
   }
@@ -373,7 +562,79 @@ export class InvestmentTrackerService {
     this.totalInvestmentReturns.next(0);
     this.targetPrice.next(5000);
     this.currentMonth.next(0);
+    this.locBalance.next(0);
+    this.locLimit.next(0);
+    this.locInterestRate.next(0);
+    this.totalLocInterestPaid.next(0);
+    this.undoStack.next([]);
+    this.eventLog.next([{ id: `EVT-${Date.now()}`, type: 'reset', date: new Date(), month: 0, description: 'All tracker data reset.' }]);
     this.saveToLocalStorage();
+  }
+
+  canUndo(): boolean {
+    return this.undoStack.value.length > 0;
+  }
+
+  undoLastMonth(): void {
+    const stack = this.undoStack.value;
+    if (stack.length === 0) return;
+    const [prev, ...rest] = stack;
+    this.investments.next((prev.investments || []).map((inv: any) => ({ ...inv, purchaseDate: new Date(inv.purchaseDate) })));
+    this.cashBalance.next(prev.cashBalance);
+    this.monthlyIncome.next(prev.monthlyIncome);
+    this.totalCashflowAdded.next(prev.totalCashflowAdded);
+    this.totalInvestmentReturns.next(prev.totalInvestmentReturns);
+    this.targetPrice.next(prev.targetPrice);
+    this.currentMonth.next(prev.currentMonth);
+    this.locBalance.next(prev.locBalance);
+    this.totalLocInterestPaid.next(prev.totalLocInterestPaid);
+    this.undoStack.next(rest);
+    // Restore event log but append an undo marker
+    const restoredLog = (prev.eventLog || []).map((e: any) => ({ ...e, date: new Date(e.date) }));
+    const undoEvent: TrackerEvent = {
+      id: `EVT-${Date.now()}`,
+      type: 'month-processed',
+      date: new Date(),
+      month: prev.currentMonth,
+      description: `↩ Month ${prev.currentMonth + 1} unprocessed — state restored to Month ${prev.currentMonth}`
+    };
+    this.eventLog.next([undoEvent, ...restoredLog]);
+    this.updateSnapshots();
+    this.saveToLocalStorage();
+  }
+
+  private pushUndoState(): void {
+    const state = {
+      investments: this.investments.value.map(inv => ({ ...inv })),
+      cashBalance: this.cashBalance.value,
+      monthlyIncome: this.monthlyIncome.value,
+      totalCashflowAdded: this.totalCashflowAdded.value,
+      totalInvestmentReturns: this.totalInvestmentReturns.value,
+      targetPrice: this.targetPrice.value,
+      currentMonth: this.currentMonth.value,
+      locBalance: this.locBalance.value,
+      totalLocInterestPaid: this.totalLocInterestPaid.value,
+      eventLog: this.eventLog.value
+    };
+    const stack = [state, ...this.undoStack.value].slice(0, 12); // keep at most 12 undo states
+    this.undoStack.next(stack);
+  }
+
+  private logEvent(type: TrackerEventType, description: string, amount?: number, meta?: Record<string, string | number | boolean>): void {
+    const event: TrackerEvent = {
+      id: `EVT-${Date.now()}-${Math.random().toString(36).substr(2, 6)}`,
+      type,
+      date: new Date(),
+      month: this.currentMonth.value,
+      description,
+      amount,
+      meta
+    };
+    this.eventLog.next([event, ...this.eventLog.value]);
+  }
+
+  private fmt(amount: number): string {
+    return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(amount);
   }
 
   private saveToLocalStorage(): void {
@@ -390,7 +651,13 @@ export class InvestmentTrackerService {
         totalCashflowAdded: this.totalCashflowAdded.value,
         totalInvestmentReturns: this.totalInvestmentReturns.value,
         targetPrice: this.targetPrice.value,
-        currentMonth: this.currentMonth.value
+        currentMonth: this.currentMonth.value,
+        locBalance: this.locBalance.value,
+        locLimit: this.locLimit.value,
+        locInterestRate: this.locInterestRate.value,
+        totalLocInterestPaid: this.totalLocInterestPaid.value,
+        eventLog: this.eventLog.value,
+        undoStack: this.undoStack.value
       };
       localStorage.setItem('investmentTrackerData', JSON.stringify(data));
     } catch (e) {
@@ -409,7 +676,8 @@ export class InvestmentTrackerService {
         // Convert date strings back to Date objects
         const investments = (parsed.investments || []).map((inv: any) => ({
           ...inv,
-          purchaseDate: new Date(inv.purchaseDate)
+          purchaseDate: new Date(inv.purchaseDate),
+          locFinancedAmount: inv.locFinancedAmount ?? 0
         }));
         const snapshots = (parsed.snapshots || []).map((snap: any) => ({
           ...snap,
@@ -429,6 +697,13 @@ export class InvestmentTrackerService {
         this.totalInvestmentReturns.next(parsed.totalInvestmentReturns || 0);
         this.targetPrice.next(parsed.targetPrice || 5000);
         this.currentMonth.next(parsed.currentMonth || 0);
+        this.locBalance.next(parsed.locBalance || 0);
+        this.locLimit.next(parsed.locLimit || 0);
+        this.locInterestRate.next(parsed.locInterestRate || 0);
+        this.totalLocInterestPaid.next(parsed.totalLocInterestPaid || 0);
+        const eventLog = (parsed.eventLog || []).map((e: any) => ({ ...e, date: new Date(e.date) }));
+        this.eventLog.next(eventLog);
+        this.undoStack.next(parsed.undoStack || []);
       }
     } catch (e) {
       console.error('Failed to load from local storage', e);
