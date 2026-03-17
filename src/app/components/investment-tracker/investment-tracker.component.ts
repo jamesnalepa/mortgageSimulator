@@ -358,6 +358,74 @@ export class InvestmentTrackerComponent implements OnInit, OnDestroy {
     return this.monthlyIncome + this.getMonthlyInvestmentReturns();
   }
 
+  // ── Account Overview helpers ──────────────────────────────────────────────
+
+  /** Total of all active non-mortgage-note investment balances (the "deployed" portion). */
+  getDeployedBalance(): number {
+    return this.investments
+      .filter(inv => inv.status === 'active' && inv.type !== 'mortgage-note')
+      .reduce((sum, inv) => sum + inv.currentBalance, 0);
+  }
+
+  /**
+   * Gross account value: liquid cash + every investment balance still outstanding.
+   * Completed investments have already returned their principal to cash, so only
+   * active positions count here.
+   */
+  getTotalAccountValue(): number {
+    return this.cashBalance + this.getDeployedBalance();
+  }
+
+  /** Net account value after subtracting external LOC debt. */
+  getNetAccountValue(): number {
+    return this.getTotalAccountValue() - this.locBalance;
+  }
+
+  getDeploymentRate(): number {
+    const total = this.getTotalAccountValue();
+    return total > 0 ? (this.getDeployedBalance() / total) * 100 : 0;
+  }
+
+  getLiquidRate(): number {
+    return 100 - this.getDeploymentRate();
+  }
+
+  /** Sum of interest earned this month across all active non-mortgage-note investments (estimated). */
+  getEstimatedMonthlyYield(): number {
+    return this.investments
+      .filter(inv => inv.status === 'active' && inv.monthsRemaining > 0 && inv.type !== 'mortgage-note')
+      .reduce((sum, inv) => {
+        if (inv.type === 'hysa') {
+          const monthlyRate = Math.pow(1 + inv.interestRate, 1 / 12) - 1;
+          return sum + inv.currentBalance * monthlyRate;
+        }
+        return sum + inv.currentBalance * (inv.interestRate / 12);
+      }, 0);
+  }
+
+  getNetMonthlyFlow(): number {
+    return this.monthlyIncome + this.getMonthlyInvestmentReturns() - this.getMonthlyLocInterest();
+  }
+
+  getTotalInterestEarned(): number {
+    return this.investments
+      .filter(inv => inv.type !== 'mortgage-note')
+      .reduce((sum, inv) => sum + inv.totalInterestEarned, 0);
+  }
+
+  getTotalLocFinancedInDeployments(): number {
+    return this.investments
+      .filter(inv => inv.status === 'active' && inv.type !== 'mortgage-note')
+      .reduce((sum, inv) => sum + (inv.locFinancedAmount ?? 0), 0);
+  }
+
+  /** Active non-mortgage-note investments sorted by months remaining ascending (maturing soonest first). */
+  getActiveInvestmentsSorted(): typeof this.investments {
+    return [...this.investments]
+      .filter(inv => inv.status === 'active' && inv.type !== 'mortgage-note')
+      .sort((a, b) => a.monthsRemaining - b.monthsRemaining);
+  }
+
   getNextInvestmentTarget(): number {
     return this.targetPrice;
   }

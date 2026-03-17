@@ -6,6 +6,125 @@
     <h3>{{ getCurrentMonthLabel() }}</h3>
   </div>
 
+  <!-- Account Overview -->
+  <div class="account-overview" *ngIf="investments.length > 0 || cashBalance > 0">
+    <h2>HYSA Overview</h2>
+    <p class="account-overview-sub">Your full account balance — liquid cash and deployed positions are all part of the same pool.</p>
+
+    <!-- Top-level balance row -->
+    <div class="account-balance-row">
+      <div class="account-balance-card primary">
+        <span class="account-balance-label">Total Account Value</span>
+        <span class="account-balance-value">{{ formatCurrency(getTotalAccountValue()) }}</span>
+        <span class="account-balance-sub" *ngIf="locBalance > 0">Net of LOC debt: {{ formatCurrency(getNetAccountValue()) }}</span>
+      </div>
+      <div class="account-balance-card liquid">
+        <span class="account-balance-label">Liquid (Available)</span>
+        <span class="account-balance-value">{{ formatCurrency(cashBalance) }}</span>
+        <span class="account-balance-sub">{{ getLiquidRate() | number:'1.0-1' }}% of account</span>
+      </div>
+      <div class="account-balance-card deployed">
+        <span class="account-balance-label">Deployed in Notes</span>
+        <span class="account-balance-value">{{ formatCurrency(getDeployedBalance()) }}</span>
+        <span class="account-balance-sub">{{ getDeploymentRate() | number:'1.0-1' }}% of account</span>
+      </div>
+      <div class="account-balance-card yield">
+        <span class="account-balance-label">Monthly Yield (est.)</span>
+        <span class="account-balance-value">{{ formatCurrency(getEstimatedMonthlyYield()) }}</span>
+        <span class="account-balance-sub">interest earned this month</span>
+      </div>
+    </div>
+
+    <!-- Deployment bar -->
+    <div class="deployment-bar-wrap">
+      <div class="deployment-bar-labels">
+        <span class="bar-label-liquid">Liquid {{ getLiquidRate() | number:'1.0-1' }}%</span>
+        <span class="bar-label-deployed">Deployed {{ getDeploymentRate() | number:'1.0-1' }}%</span>
+      </div>
+      <div class="deployment-bar">
+        <div class="deployment-bar-liquid" [style.width.%]="getLiquidRate()"></div>
+        <div class="deployment-bar-deployed" [style.width.%]="getDeploymentRate()"></div>
+      </div>
+    </div>
+
+    <!-- Monthly Cash Flow summary -->
+    <div class="account-flow-row">
+      <div class="account-flow-card inflow">
+        <span class="flow-label">Monthly Income</span>
+        <span class="flow-value">+{{ formatCurrency(monthlyIncome) }}</span>
+      </div>
+      <div class="account-flow-card inflow">
+        <span class="flow-label">Investment Returns</span>
+        <span class="flow-value">+{{ formatCurrency(getMonthlyInvestmentReturns()) }}</span>
+      </div>
+      <div class="account-flow-card outflow" *ngIf="locBalance > 0">
+        <span class="flow-label">LOC Interest</span>
+        <span class="flow-value">-{{ formatCurrency(getMonthlyLocInterest()) }}</span>
+      </div>
+      <div class="account-flow-card net">
+        <span class="flow-label">Net Monthly</span>
+        <span class="flow-value">{{ formatCurrency(getNetMonthlyFlow()) }}</span>
+      </div>
+      <div class="account-flow-card earned">
+        <span class="flow-label">Total Interest Earned</span>
+        <span class="flow-value">{{ formatCurrency(getTotalInterestEarned()) }}</span>
+      </div>
+    </div>
+
+    <!-- Active positions with return timeline -->
+    <div class="account-positions" *ngIf="getActiveInvestmentsSorted().length > 0">
+      <h3>Active Positions <span class="positions-sub">(sorted by maturity)</span></h3>
+      <div class="positions-table-wrap">
+        <table class="positions-table">
+          <thead>
+            <tr>
+              <th>Type</th>
+              <th>Balance</th>
+              <th>Monthly Payment</th>
+              <th>Est. Interest/mo</th>
+              <th>% of Account</th>
+              <th>LOC Financed</th>
+              <th>Months to Maturity</th>
+              <th>Returns to Liquid</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr *ngFor="let inv of getActiveInvestmentsSorted()">
+              <td><span class="type-badge" [ngClass]="inv.type">{{ getInvestmentTypeLabel(inv.type) }}</span></td>
+              <td class="balance">{{ formatCurrency(inv.currentBalance) }}</td>
+              <td>{{ formatCurrency(inv.monthlyPayment) }}</td>
+              <td class="interest">{{ formatCurrency(inv.currentBalance * (inv.interestRate / 12)) }}</td>
+              <td>
+                <span class="pct-bar-wrap">
+                  <span class="pct-bar-fill" [style.width.%]="getTotalAccountValue() > 0 ? (inv.currentBalance / getTotalAccountValue()) * 100 : 0"></span>
+                  <span class="pct-label">{{ getTotalAccountValue() > 0 ? ((inv.currentBalance / getTotalAccountValue()) * 100 | number:'1.0-1') : '0' }}%</span>
+                </span>
+              </td>
+              <td>
+                <span *ngIf="inv.locFinancedAmount > 0" class="loc-financed-badge">{{ formatCurrency(inv.locFinancedAmount) }}</span>
+                <span *ngIf="!inv.locFinancedAmount || inv.locFinancedAmount === 0" class="no-loc">—</span>
+              </td>
+              <td class="maturity" [class.maturing-soon]="inv.monthsRemaining <= 3">{{ inv.monthsRemaining }} mo</td>
+              <td class="returns-month">{{ inv.monthsRemaining <= 1 ? 'This month!' : 'Month ' + (currentMonth + inv.monthsRemaining) }}</td>
+            </tr>
+          </tbody>
+          <tfoot>
+            <tr class="totals-row">
+              <td><strong>Totals</strong></td>
+              <td class="balance"><strong>{{ formatCurrency(getDeployedBalance()) }}</strong></td>
+              <td><strong>{{ formatCurrency(getMonthlyInvestmentReturns()) }}</strong></td>
+              <td class="interest"><strong>{{ formatCurrency(getEstimatedMonthlyYield()) }}</strong></td>
+              <td></td>
+              <td><strong *ngIf="getTotalLocFinancedInDeployments() > 0">{{ formatCurrency(getTotalLocFinancedInDeployments()) }}</strong><span *ngIf="getTotalLocFinancedInDeployments() === 0" class="no-loc">—</span></td>
+              <td></td>
+              <td></td>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+    </div>
+  </div>
+
   <!-- Monthly Cashflow Configuration -->
   <div class="cashflow-panel">
     <h2>Monthly Cashflow Configuration</h2>

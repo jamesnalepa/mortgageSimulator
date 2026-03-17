@@ -11,7 +11,253 @@ h1 {
   text-align: center;
 }
 
-/* Month Display */
+/* ── Account Overview ──────────────────────────────────────────────────────── */
+.account-overview {
+  background: white;
+  border-radius: 10px;
+  padding: 28px;
+  margin-bottom: 30px;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
+  border-top: 4px solid #6366f1;
+}
+
+.account-overview h2 {
+  margin-top: 0;
+  color: #1e1b4b;
+  border: none;
+  padding: 0;
+  margin-bottom: 4px;
+}
+
+.account-overview-sub {
+  color: #6b7280;
+  font-size: 13px;
+  margin: 0 0 24px 0;
+  font-style: italic;
+}
+
+/* Balance cards */
+.account-balance-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+.account-balance-card {
+  border-radius: 10px;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.account-balance-label {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  font-weight: 700;
+  opacity: 0.8;
+}
+
+.account-balance-value {
+  font-size: 28px;
+  font-weight: 800;
+  line-height: 1.1;
+}
+
+.account-balance-sub {
+  font-size: 12px;
+  opacity: 0.75;
+}
+
+.account-balance-card.primary {
+  background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%);
+  color: white;
+}
+
+.account-balance-card.liquid {
+  background: linear-gradient(135deg, #059669 0%, #10b981 100%);
+  color: white;
+}
+
+.account-balance-card.deployed {
+  background: linear-gradient(135deg, #2563eb 0%, #3b82f6 100%);
+  color: white;
+}
+
+.account-balance-card.yield {
+  background: linear-gradient(135deg, #d97706 0%, #f59e0b 100%);
+  color: white;
+}
+
+/* Deployment bar */
+.deployment-bar-wrap {
+  margin-bottom: 24px;
+}
+
+.deployment-bar-labels {
+  display: flex;
+  justify-content: space-between;
+  font-size: 12px;
+  font-weight: 600;
+  margin-bottom: 6px;
+  color: #374151;
+}
+
+.bar-label-liquid { color: #059669; }
+.bar-label-deployed { color: #2563eb; }
+
+.deployment-bar {
+  height: 14px;
+  border-radius: 7px;
+  overflow: hidden;
+  background: #e5e7eb;
+  display: flex;
+}
+
+.deployment-bar-liquid {
+  background: linear-gradient(90deg, #059669, #10b981);
+  transition: width 0.5s ease;
+  min-width: 0;
+}
+
+.deployment-bar-deployed {
+  background: linear-gradient(90deg, #2563eb, #3b82f6);
+  transition: width 0.5s ease;
+  min-width: 0;
+}
+
+/* Monthly flow cards */
+.account-flow-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-bottom: 28px;
+}
+
+.account-flow-card {
+  flex: 1;
+  min-width: 140px;
+  border-radius: 8px;
+  padding: 14px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.flow-label {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.flow-value {
+  font-size: 20px;
+  font-weight: 800;
+}
+
+.account-flow-card.inflow  { background: #f0fdf4; border-left: 3px solid #10b981; }
+.account-flow-card.inflow  .flow-label { color: #065f46; }
+.account-flow-card.inflow  .flow-value { color: #059669; }
+
+.account-flow-card.outflow { background: #fef2f2; border-left: 3px solid #ef4444; }
+.account-flow-card.outflow .flow-label { color: #7f1d1d; }
+.account-flow-card.outflow .flow-value { color: #dc2626; }
+
+.account-flow-card.net     { background: #eff6ff; border-left: 3px solid #3b82f6; }
+.account-flow-card.net     .flow-label { color: #1e3a8a; }
+.account-flow-card.net     .flow-value { color: #2563eb; }
+
+.account-flow-card.earned  { background: #fefce8; border-left: 3px solid #f59e0b; }
+.account-flow-card.earned  .flow-label { color: #78350f; }
+.account-flow-card.earned  .flow-value { color: #d97706; }
+
+/* Active positions table */
+.account-positions h3 {
+  margin: 0 0 14px 0;
+  font-size: 16px;
+  color: #1f2937;
+}
+
+.positions-sub {
+  font-size: 12px;
+  color: #9ca3af;
+  font-weight: 400;
+  font-style: italic;
+}
+
+.positions-table-wrap {
+  overflow-x: auto;
+  border-radius: 8px;
+  border: 1px solid #e5e7eb;
+}
+
+.positions-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.positions-table thead {
+  background: #f8fafc;
+  border-bottom: 2px solid #e5e7eb;
+}
+
+.positions-table th {
+  padding: 10px 14px;
+  text-align: left;
+  font-weight: 600;
+  color: #374151;
+  white-space: nowrap;
+}
+
+.positions-table td {
+  padding: 10px 14px;
+  border-bottom: 1px solid #f3f4f6;
+  color: #4b5563;
+  vertical-align: middle;
+}
+
+.positions-table tbody tr:last-child td { border-bottom: none; }
+.positions-table tbody tr:hover { background: #fafafa; }
+
+.positions-table tfoot .totals-row td {
+  border-top: 2px solid #e5e7eb;
+  background: #f8fafc;
+  padding: 10px 14px;
+}
+
+.maturity { font-weight: 600; }
+.maturing-soon { color: #dc2626 !important; }
+.returns-month { font-size: 12px; color: #6366f1; font-weight: 500; }
+
+/* % bar inside table cell */
+.pct-bar-wrap {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 90px;
+}
+
+.pct-bar-fill {
+  display: inline-block;
+  height: 8px;
+  background: linear-gradient(90deg, #6366f1, #a5b4fc);
+  border-radius: 4px;
+  min-width: 2px;
+  max-width: 60px;
+  transition: width 0.3s;
+}
+
+.pct-label {
+  font-size: 12px;
+  color: #374151;
+  white-space: nowrap;
+}
+
+/* ── Account Overview ───────────────────────────────────────────────────────── */
 .month-display {
   background: linear-gradient(135deg, #1e3a8a 0%, #7c3aed 100%);
   color: white;
