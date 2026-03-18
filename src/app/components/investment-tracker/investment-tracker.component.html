@@ -294,8 +294,10 @@
     <div class="cash-card">
       <h3>Next Purchase Target</h3>
       <p class="target-amount">{{ formatCurrency(getNextInvestmentTarget()) }}</p>
-      <p class="target-needed" [class.ready]="cashBalance >= getNextInvestmentTarget()">
-        {{ cashBalance >= getNextInvestmentTarget() ? '✓ Ready to invest!' : 'Need ' + formatCurrency(getNextInvestmentTarget() - cashBalance) }}
+      <p class="target-needed" [class.ready]="(locLimit > 0 ? cashBalance + getAvailableCredit() : cashBalance) >= getNextInvestmentTarget()">
+        {{ (locLimit > 0 ? cashBalance + getAvailableCredit() : cashBalance) >= getNextInvestmentTarget()
+          ? '✓ Ready to invest!'
+          : 'Need ' + formatCurrency(getNextInvestmentTarget() - (locLimit > 0 ? cashBalance + getAvailableCredit() : cashBalance)) + (locLimit > 0 ? ' more buying power' : '') }}
       </p>
     </div>
     <div class="cash-card">
@@ -303,7 +305,7 @@
       <p class="months-until" [class.ready]="getMonthsUntilNextPurchase() === 0">
         {{ getMonthsUntilNextPurchase() === 0 ? 'Now' : getMonthsUntilNextPurchase() + ' months' }}
       </p>
-      <p class="months-info">at current cash flow</p>
+      <p class="months-info">{{ locLimit > 0 ? 'at net cash flow (after LOC interest)' : 'at current cash flow' }}</p>
     </div>
   </div>
 

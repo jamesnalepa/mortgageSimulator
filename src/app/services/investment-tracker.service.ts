@@ -319,23 +319,31 @@ export class InvestmentTrackerService {
   private calculateMonthsUntilNextPurchase(): number {
     const target = this.targetPrice.value;
     const currentCash = this.cashBalance.value;
-    
-    // If we already have enough cash, return 0
-    if (currentCash >= target) {
+    const locConfigured = this.locLimit.value > 0;
+
+    // When LOC is configured, purchasing power = cash + available credit
+    const purchasingPower = locConfigured
+      ? currentCash + Math.max(0, this.locLimit.value - this.locBalance.value)
+      : currentCash;
+
+    if (purchasingPower >= target) {
       return 0;
     }
-    
-    // Calculate how much more we need
-    const deficit = target - currentCash;
-    const monthlyCashFlow = this.getTotalMonthlyCashFlow();
-    
-    // Avoid division by zero
-    if (monthlyCashFlow <= 0) {
-      return -1; // Indicate we can't reach target with no cash flow
+
+    const deficit = target - purchasingPower;
+
+    // Monthly accumulation rate: gross cash flow minus ongoing LOC interest drag
+    const grossCashFlow = this.getTotalMonthlyCashFlow();
+    const monthlyLocInterest = locConfigured
+      ? this.locBalance.value * (this.locInterestRate.value / 12)
+      : 0;
+    const netMonthlyCashFlow = grossCashFlow - monthlyLocInterest;
+
+    if (netMonthlyCashFlow <= 0) {
+      return -1;
     }
-    
-    // Calculate months needed to accumulate the deficit
-    return Math.ceil(deficit / monthlyCashFlow);
+
+    return Math.ceil(deficit / netMonthlyCashFlow);
   }
 
   private getTotalMonthlyCashFlow(): number {

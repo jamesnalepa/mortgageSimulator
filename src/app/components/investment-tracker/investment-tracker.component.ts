@@ -454,23 +454,28 @@ export class InvestmentTrackerComponent implements OnInit, OnDestroy {
   }
 
   getMonthsUntilNextPurchase(): number {
-    // Calculate how much more we need
-    const deficit = this.targetPrice - this.cashBalance;
-    
-    // If we already have enough cash, return 0
+    const locConfigured = this.locLimit > 0;
+    const purchasingPower = locConfigured
+      ? this.cashBalance + this.getAvailableCredit()
+      : this.cashBalance;
+
+    const deficit = this.targetPrice - purchasingPower;
+
     if (deficit <= 0) {
       return 0;
     }
-    
-    const monthlyCashFlow = this.getTotalMonthlyCashFlow();
-    
-    // Avoid division by zero
-    if (monthlyCashFlow <= 0) {
-      return -1; // Indicate we can't reach target with no cash flow
+
+    const grossCashFlow = this.getTotalMonthlyCashFlow();
+    const monthlyLocInterest = locConfigured
+      ? this.trackerService.getMonthlyLocInterest()
+      : 0;
+    const netMonthlyCashFlow = grossCashFlow - monthlyLocInterest;
+
+    if (netMonthlyCashFlow <= 0) {
+      return -1;
     }
-    
-    // Calculate months needed to accumulate the deficit
-    return Math.ceil(deficit / monthlyCashFlow);
+
+    return Math.ceil(deficit / netMonthlyCashFlow);
   }
 
   exportToCSV(): void {
