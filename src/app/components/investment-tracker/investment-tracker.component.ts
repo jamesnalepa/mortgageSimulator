@@ -47,6 +47,7 @@ export class InvestmentTrackerComponent implements OnInit, OnDestroy {
   eventLog: TrackerEvent[] = [];
   showAllEvents: boolean = false;
   canUndo: boolean = false;
+  monthlyExpenses: number = 0;
   private subscriptions = new Subscription();
 
   constructor(
@@ -64,7 +65,8 @@ export class InvestmentTrackerComponent implements OnInit, OnDestroy {
     });
 
     this.cashflowForm = this.fb.group({
-      monthlyIncome: [5000, [Validators.required, Validators.min(0)]]
+      monthlyIncome: [5000, [Validators.required, Validators.min(0)]],
+      monthlyExpenses: [0, [Validators.required, Validators.min(0)]]
     });
 
     this.locForm = this.fb.group({
@@ -104,6 +106,13 @@ export class InvestmentTrackerComponent implements OnInit, OnDestroy {
       this.trackerService.monthlyIncome$.subscribe(income => {
         this.monthlyIncome = income;
         this.cashflowForm.patchValue({ monthlyIncome: income });
+      })
+    );
+
+    this.subscriptions.add(
+      this.trackerService.monthlyExpenses$.subscribe(expenses => {
+        this.monthlyExpenses = expenses;
+        this.cashflowForm.patchValue({ monthlyExpenses: expenses });
       })
     );
 
@@ -273,6 +282,8 @@ export class InvestmentTrackerComponent implements OnInit, OnDestroy {
     if (this.cashflowForm.valid) {
       const income = this.cashflowForm.get('monthlyIncome')?.value;
       this.trackerService.setMonthlyIncome(income);
+      const expenses = this.cashflowForm.get('monthlyExpenses')?.value ?? 0;
+      this.trackerService.setMonthlyExpenses(expenses);
     }
   }
 
@@ -390,17 +401,29 @@ export class InvestmentTrackerComponent implements OnInit, OnDestroy {
     return 100 - this.getDeploymentRate();
   }
 
-  /** Sum of interest earned this month across all active non-mortgage-note investments (estimated). */
+  /**
+   * Estimated monthly yield on the entire account balance.
+   * Uses the weighted-average monthly rate from active non-mortgage-note positions
+   * and applies it to the full account value (liquid + deployed).
+   */
   getEstimatedMonthlyYield(): number {
-    return this.investments
-      .filter(inv => inv.status === 'active' && inv.monthsRemaining > 0 && inv.type !== 'mortgage-note')
-      .reduce((sum, inv) => {
-        if (inv.type === 'hysa') {
-          const monthlyRate = Math.pow(1 + inv.interestRate, 1 / 12) - 1;
-          return sum + inv.currentBalance * monthlyRate;
-        }
-        return sum + inv.currentBalance * (inv.interestRate / 12);
-      }, 0);
+    const activePositions = this.investments.filter(
+      inv => inv.status === 'active' && inv.monthsRemaining > 0 && inv.type !== 'mortgage-note'
+    );
+    if (activePositions.length === 0) return 0;
+
+    const totalDeployed = activePositions.reduce((sum, inv) => sum + inv.currentBalance, 0);
+    if (totalDeployed === 0) return 0;
+
+    // Weighted-average monthly rate across all active positions
+    const weightedMonthlyRate = activePositions.reduce((sum, inv) => {
+      const monthlyRate = inv.type === 'hysa'
+        ? Math.pow(1 + inv.interestRate, 1 / 12) - 1
+        : inv.interestRate / 12;
+      return sum + (inv.currentBalance / totalDeployed) * monthlyRate;
+    }, 0);
+
+    return this.getTotalAccountValue() * weightedMonthlyRate;
   }
 
   getNetMonthlyFlow(): number {

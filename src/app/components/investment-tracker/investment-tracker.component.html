@@ -142,12 +142,38 @@
             placeholder="5000"
           />
         </div>
+        <div class="form-group">
+          <label for="monthlyExpensesInput">Monthly Expenses ($):</label>
+          <input
+            type="number"
+            id="monthlyExpensesInput"
+            formControlName="monthlyExpenses"
+            class="form-control"
+            min="0"
+            step="100"
+            placeholder="0"
+          />
+          <!-- <span class="field-hint">Deducted from cash before investing each month</span> -->
+        </div>
         <button type="button" class="btn btn-primary" (click)="setMonthlyIncome()" [disabled]="cashflowForm.invalid">
-          Set Monthly Income
+          Save Cashflow Settings
         </button>
       </div>
+      <div class="cashflow-summary" *ngIf="monthlyIncome > 0 || monthlyExpenses > 0">
+        <span class="cashflow-summary-item income">
+          <strong>Income:</strong> {{ formatCurrency(monthlyIncome) }}/mo
+        </span>
+        <span class="cashflow-summary-sep">−</span>
+        <span class="cashflow-summary-item expenses">
+          <strong>Expenses:</strong> {{ formatCurrency(monthlyExpenses) }}/mo
+        </span>
+        <span class="cashflow-summary-sep">=</span>
+        <span class="cashflow-summary-item net" [class.negative]="monthlyIncome - monthlyExpenses < 0">
+          <strong>Net to invest:</strong> {{ formatCurrency(monthlyIncome - monthlyExpenses) }}/mo
+        </span>
+      </div>
       <p class="cashflow-info">
-        This amount will be added to your available cash each month when you process a month advance.
+        Income is added to cash each month. Expenses are deducted first, before investment returns are counted in, keeping that money out of the investing pool.
       </p>
     </form>
   </div>

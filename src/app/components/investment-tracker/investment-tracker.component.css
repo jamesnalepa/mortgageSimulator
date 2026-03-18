@@ -302,7 +302,7 @@ h1 {
 
 .cashflow-grid {
   display: grid;
-  grid-template-columns: 1fr auto;
+  grid-template-columns: 1fr 1fr auto;
   gap: 15px;
   align-items: flex-end;
 }
@@ -318,6 +318,25 @@ h1 {
   font-style: italic;
   line-height: 1.5;
 }
+
+.cashflow-summary {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  background: white;
+  border-radius: 8px;
+  padding: 12px 16px;
+  font-size: 13px;
+  border: 1px solid #c7d9ff;
+}
+
+.cashflow-summary-item { display: flex; align-items: center; gap: 4px; }
+.cashflow-summary-item.income strong { color: #059669; }
+.cashflow-summary-item.expenses strong { color: #dc2626; }
+.cashflow-summary-item.net strong { color: #2563eb; }
+.cashflow-summary-item.net.negative strong { color: #dc2626; }
+.cashflow-summary-sep { color: #9ca3af; font-weight: 700; font-size: 16px; }
 
 /* Cash Display Panel */
 .cash-display-panel {

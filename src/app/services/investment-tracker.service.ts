@@ -49,6 +49,7 @@ export class InvestmentTrackerService {
   private locLimit = new BehaviorSubject<number>(0);
   private locInterestRate = new BehaviorSubject<number>(0); // annual rate (0-1)
   private totalLocInterestPaid = new BehaviorSubject<number>(0);
+  private monthlyExpenses = new BehaviorSubject<number>(0);
   private eventLog = new BehaviorSubject<TrackerEvent[]>([]);
   private undoStack = new BehaviorSubject<any[]>([]); // max 12 states, most-recent first
 
@@ -65,6 +66,7 @@ export class InvestmentTrackerService {
   public locLimit$ = this.locLimit.asObservable();
   public locInterestRate$ = this.locInterestRate.asObservable();
   public totalLocInterestPaid$ = this.totalLocInterestPaid.asObservable();
+  public monthlyExpenses$ = this.monthlyExpenses.asObservable();
   public eventLog$ = this.eventLog.asObservable();
   public canUndo$ = this.undoStack.asObservable();
 
@@ -194,6 +196,20 @@ export class InvestmentTrackerService {
   setCurrentMonth(month: number): void {
     if (month >= 0) {
       this.currentMonth.next(month);
+      this.saveToLocalStorage();
+    }
+  }
+
+  getMonthlyExpenses(): number {
+    return this.monthlyExpenses.value;
+  }
+
+  setMonthlyExpenses(amount: number): void {
+    if (amount >= 0) {
+      this.monthlyExpenses.next(amount);
+      this.logEvent('cash-added',
+        `Monthly expenses set to ${this.fmt(amount)} — will be deducted from cash each month before investing`,
+        amount);
       this.saveToLocalStorage();
     }
   }
@@ -340,6 +356,13 @@ export class InvestmentTrackerService {
     // Snapshot full state before mutating so it can be restored
     this.pushUndoState();
 
+    // Deduct monthly expenses from cash first, before any income or returns are added
+    const expenses = this.monthlyExpenses.value;
+    if (expenses > 0) {
+      const cashAfterExpenses = Math.max(0, this.cashBalance.value - expenses);
+      this.cashBalance.next(cashAfterExpenses);
+    }
+
     const currentInvestments = this.investments.value;
     const now = new Date();
     let totalMonthlyReturns = 0; // Track total returns (principal + interest) from investments
@@ -445,6 +468,9 @@ export class InvestmentTrackerService {
     const monthNum = this.currentMonth.value;
     const locInterestThisMonth = locBal > 0 ? locBal * (this.locInterestRate.value / 12) : 0;
     let monthDesc = `Month ${monthNum} processed — income +${this.fmt(monthlyIncomeAmount)}, investment returns +${this.fmt(totalMonthlyReturns)}`;
+    if (expenses > 0) {
+      monthDesc += `, expenses -${this.fmt(expenses)}`;
+    }
     if (locInterestThisMonth > 0) {
       monthDesc += `, LOC interest -${this.fmt(locInterestThisMonth)} (balance ${this.fmt(this.locBalance.value)})`;
     }
@@ -566,6 +592,7 @@ export class InvestmentTrackerService {
     this.locLimit.next(0);
     this.locInterestRate.next(0);
     this.totalLocInterestPaid.next(0);
+    this.monthlyExpenses.next(0);
     this.undoStack.next([]);
     this.eventLog.next([{ id: `EVT-${Date.now()}`, type: 'reset', date: new Date(), month: 0, description: 'All tracker data reset.' }]);
     this.saveToLocalStorage();
@@ -588,6 +615,7 @@ export class InvestmentTrackerService {
     this.currentMonth.next(prev.currentMonth);
     this.locBalance.next(prev.locBalance);
     this.totalLocInterestPaid.next(prev.totalLocInterestPaid);
+    if (prev.monthlyExpenses !== undefined) this.monthlyExpenses.next(prev.monthlyExpenses);
     this.undoStack.next(rest);
     // Restore event log but append an undo marker
     const restoredLog = (prev.eventLog || []).map((e: any) => ({ ...e, date: new Date(e.date) }));
@@ -614,6 +642,7 @@ export class InvestmentTrackerService {
       currentMonth: this.currentMonth.value,
       locBalance: this.locBalance.value,
       totalLocInterestPaid: this.totalLocInterestPaid.value,
+      monthlyExpenses: this.monthlyExpenses.value,
       eventLog: this.eventLog.value
     };
     const stack = [state, ...this.undoStack.value].slice(0, 12); // keep at most 12 undo states
@@ -656,6 +685,7 @@ export class InvestmentTrackerService {
         locLimit: this.locLimit.value,
         locInterestRate: this.locInterestRate.value,
         totalLocInterestPaid: this.totalLocInterestPaid.value,
+        monthlyExpenses: this.monthlyExpenses.value,
         eventLog: this.eventLog.value,
         undoStack: this.undoStack.value
       };
@@ -701,6 +731,7 @@ export class InvestmentTrackerService {
         this.locLimit.next(parsed.locLimit || 0);
         this.locInterestRate.next(parsed.locInterestRate || 0);
         this.totalLocInterestPaid.next(parsed.totalLocInterestPaid || 0);
+        this.monthlyExpenses.next(parsed.monthlyExpenses || 0);
         const eventLog = (parsed.eventLog || []).map((e: any) => ({ ...e, date: new Date(e.date) }));
         this.eventLog.next(eventLog);
         this.undoStack.next(parsed.undoStack || []);
