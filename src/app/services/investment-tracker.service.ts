@@ -356,7 +356,18 @@ export class InvestmentTrackerService {
     // Snapshot full state before mutating so it can be restored
     this.pushUndoState();
 
-    // Deduct monthly expenses from cash first, before any income or returns are added
+    // Charge LOC interest on the previous month's balance first, before any new income arrives.
+    // This allows repayments made during the prior month to reduce the balance before interest accrues.
+    const locBal = this.locBalance.value;
+    let locInterestThisMonth = 0;
+    if (locBal > 0) {
+      locInterestThisMonth = locBal * (this.locInterestRate.value / 12);
+      const cashAfterLocInterest = Math.max(0, this.cashBalance.value - locInterestThisMonth);
+      this.cashBalance.next(cashAfterLocInterest);
+      this.totalLocInterestPaid.next(this.totalLocInterestPaid.value + locInterestThisMonth);
+    }
+
+    // Deduct monthly expenses from cash before any income or returns are added
     const expenses = this.monthlyExpenses.value;
     if (expenses > 0) {
       const cashAfterExpenses = Math.max(0, this.cashBalance.value - expenses);
@@ -446,15 +457,6 @@ export class InvestmentTrackerService {
     const totalCashAddition = monthlyIncomeAmount + totalMonthlyReturns;
     const newCashBalance = this.cashBalance.value + totalCashAddition;
     this.cashBalance.next(newCashBalance);
-
-    // Deduct LOC monthly interest from cash
-    const locBal = this.locBalance.value;
-    if (locBal > 0) {
-      const monthlyLocInterest = locBal * (this.locInterestRate.value / 12);
-      const cashAfterLocInterest = Math.max(0, this.cashBalance.value - monthlyLocInterest);
-      this.cashBalance.next(cashAfterLocInterest);
-      this.totalLocInterestPaid.next(this.totalLocInterestPaid.value + monthlyLocInterest);
-    }
     
     // Update total cashflow added (only from actual paycheck income, not investment returns)
     const newTotalCashflow = this.totalCashflowAdded.value + monthlyIncomeAmount;
@@ -466,13 +468,12 @@ export class InvestmentTrackerService {
 
     // Build month-processed event description
     const monthNum = this.currentMonth.value;
-    const locInterestThisMonth = locBal > 0 ? locBal * (this.locInterestRate.value / 12) : 0;
     let monthDesc = `Month ${monthNum} processed — income +${this.fmt(monthlyIncomeAmount)}, investment returns +${this.fmt(totalMonthlyReturns)}`;
     if (expenses > 0) {
       monthDesc += `, expenses -${this.fmt(expenses)}`;
     }
     if (locInterestThisMonth > 0) {
-      monthDesc += `, LOC interest -${this.fmt(locInterestThisMonth)} (balance ${this.fmt(this.locBalance.value)})`;
+      monthDesc += `, LOC interest -${this.fmt(locInterestThisMonth)} (on prior balance ${this.fmt(locBal)})`;
     }
     this.logEvent('month-processed', monthDesc, totalMonthlyReturns + monthlyIncomeAmount, {
       monthlyIncome: monthlyIncomeAmount,
